@@ -28,6 +28,7 @@ from cifar10.sgd import SGD
 from arguments import Arguments
 from data import load_data
 from attack import agr_attack_median
+from aggregation import *
 
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
@@ -110,7 +111,7 @@ candidates = []
 
 dev_type = 'std'
 z_values={3:0.69847, 5:0.7054, 8:0.71904, 10:0.72575, 12:0.73891}
-n_attackers=[0]
+n_attackers=[2]
 
 arch='alexnet'
 chkpt='./'+aggregation
@@ -220,7 +221,7 @@ for n_attacker in n_attackers:
         if is_best:
             best_global_te_acc = te_acc
 
-        print("Acc: " + str(val_acc) + " Loss: " + str(val_loss))
+#        print("Acc: " + str(val_acc) + " Loss: " + str(val_loss))
         results.append([val_acc, val_loss])
         if epoch_num%10==0 or epoch_num==args.epochs-1:
             print('%s: at %s n_at %d e %d fed_model val loss %.4f val acc %.4f best val_acc %f te_acc %f'%(aggregation, args.attack, n_attacker, epoch_num, val_loss, val_acc, best_global_acc,best_global_te_acc))
