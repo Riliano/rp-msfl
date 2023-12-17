@@ -1,6 +1,5 @@
 import torch
 
-
 def fedmes_adjustment(gradients, overlap_weight_index):
     params_to_add = []
     for client_id in range(len(gradients)):

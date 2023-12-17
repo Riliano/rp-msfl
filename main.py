@@ -8,17 +8,16 @@ import numpy as np
 
 import torch.nn as nn
 
-from aggregations import fedmes_median, fedmes_mean
+from aggregation_fedmes import fedmes_median, fedmes_mean
+from aggregation_single_server import *
+
 from cifar10.cifar10_normal_train import *
-
 from cifar10.cifar10_models import *
-
 from cifar10.sgd import SGD
 
 from arguments import Arguments
 
 from data import load_data
-#from aggregation import *
 
 from attack import min_max_attack, lie_attack, get_malicious_updates_fang_trmean, our_attack_dist
 from client import Client
@@ -91,7 +90,7 @@ fed_lr = 0.5
 criterion = nn.CrossEntropyLoss()
 use_cuda = torch.cuda.is_available()
 
-aggregation = 'average'
+aggregation = 'fedmes-average'
 multi_k = False
 candidates = []
 
@@ -184,10 +183,10 @@ for n_attacker in n_attackers:
 
             agg_grads = []
             stacked_clients_in_reach = torch.stack(clients_in_reach, dim=0)
-            if aggregation == 'median':
+            if aggregation == 'fedmes-median':
                 agg_grads = fedmes_median(stacked_clients_in_reach, overlap_weight_index)
 
-            elif aggregation == 'average':
+            elif aggregation == 'fedmes-average':
                 agg_grads = fedmes_mean(stacked_clients_in_reach, overlap_weight_index)
 
             server_aggregates.append(agg_grads)

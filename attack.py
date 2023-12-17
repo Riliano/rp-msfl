@@ -1,6 +1,5 @@
 import torch
 
-
 def get_malicious_updates_fang_trmean(all_updates, deviation, n_attackers, epoch_num, compression='none', q_level=2,
                                       norm='inf'):
     b = 2
@@ -49,7 +48,6 @@ def lie_attack(all_updates, z):
     avg = torch.mean(all_updates, dim=0)
     std = torch.std(all_updates, dim=0)
     return avg + z * std
-
 
 def min_max_attack(all_updates, model_re, n_attackers, dev_type='unit_vec'):
     if dev_type == 'unit_vec':
