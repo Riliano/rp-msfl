@@ -1,25 +1,18 @@
 from __future__ import print_function
-import argparse, os, sys, csv, shutil, time, random, operator, pickle, ast
-import numpy as np
-import pandas as pd
-import torch.nn.functional as F
+
 import torch
-import pickle
 import torch.nn as nn
 import torch.nn.parallel
 import torch.optim as optim
 import models.cifar as models
 
-#sys.path.insert(0,'/./../utils/')
-from utils.logger import *
-from utils.eval import *
-from utils.misc import *
+
 
 class cifar_mlp(nn.Module):
     def __init__(self, ninputs=3 * 32 * 32, num_classes=10):
+        super(cifar_mlp, self).__init__()
         self.ninputs = ninputs
         self.num_classes = num_classes
-        super(cifar_mlp, self).__init__()
 
         self.features = nn.Sequential(
             nn.Linear(self.ninputs, 1024),

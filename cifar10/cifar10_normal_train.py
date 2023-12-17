@@ -1,4 +1,8 @@
+
 from cifar10.cifar10_models import *
+from utils.eval import accuracy
+from utils.misc import AverageMeter
+import time
 
 
 def train(train_data, labels, model, criterion, optimizer, use_cuda, num_batchs=999999, debug_='MEDIUM', batch_size=16):
