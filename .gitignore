@@ -15,3 +15,11 @@ __pycache__/
 *.iml
 *.ipr
 *.iws
+
+utils/cifar-10-batches-py/
+utils/cifar-10-python.tar.gz
+utils/__pycache__/
+results.csv
+cifar10/__pycache__/
+models/__pycache__/
+models/cifar/__pycache__/
