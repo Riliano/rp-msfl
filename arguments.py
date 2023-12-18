@@ -12,6 +12,10 @@ class Arguments:
         self.epochs = 800
 
         self.clients = 10
+        self.num_attackers = 0
+
+        self.topology = "fedmes" # "single", "fedmes"
+        self.aggregation = "average" # "average", "median"
 
         self.attack = "agr"
 

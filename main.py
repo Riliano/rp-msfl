@@ -1,241 +1,266 @@
 from __future__ import print_function
-import argparse, os, sys, csv, shutil, time, random, operator, pickle, ast, math
-import numpy as np
-import pandas as pd
-from torch.optim import Optimizer
-import torch.nn.functional as F
-import torch
-import pickle
-import torch.nn as nn
-import torch.nn.parallel
-import torch.backends.cudnn as cudnn
-import torch.optim as optim
-import torch.utils.data as data
-import torch.multiprocessing as mp
 
-#sys.path.insert(0,'./../utils/')
-from utils.logger import *
-from utils.eval import *
-from utils.misc import *
+import os
+import pickle
+import csv
+
+import numpy as np
+
+import torch.nn as nn
+
+from aggregation_fedmes import fedmes_median, fedmes_mean
+from aggregation_single_server import *
 
 from cifar10.cifar10_normal_train import *
-from cifar10.cifar10_util import *
 from cifar10.cifar10_models import *
-from cifar10.adam import Adam
 from cifar10.sgd import SGD
 
-
 from arguments import Arguments
-from data import load_data
-from attack import agr_attack_median
-from aggregation import *
 
-import torchvision.transforms as transforms
-import torchvision.datasets as datasets
+from data import load_data
+
+from attack import min_max_attack, lie_attack, get_malicious_updates_fang_trmean, our_attack_dist
+from client import Client
 
 args = Arguments()
 
-#X, Y = load_data(args)
+# X, Y = load_data(args)
 data = pickle.load(open('./cifar10_data_ind.pkl', 'rb'))
 X = data[0]
 Y = data[1]
 # data loading
 
-nusers=args.clients
-user_tr_len=2400
+nusers = args.clients
+user_tr_len = 2400
 
-total_tr_len=user_tr_len*nusers
-val_len=3300
-te_len=3300
+total_tr_len = user_tr_len * nusers
+val_len = 3300
+te_len = 3300
 
-print('total data len: ',len(X))
+print('total data len: ', len(X))
 
 if not os.path.isfile('./cifar10_shuffle.pkl'):
     all_indices = np.arange(len(X))
     np.random.shuffle(all_indices)
-    pickle.dump(all_indices,open('./cifar10_shuffle.pkl','wb'))
+    pickle.dump(all_indices, open('./cifar10_shuffle.pkl', 'wb'))
 else:
-    all_indices=pickle.load(open('./cifar10_shuffle.pkl','rb'))
+    all_indices = pickle.load(open('./cifar10_shuffle.pkl', 'rb'))
 
-total_tr_data=X[:total_tr_len]
-total_tr_label=Y[:total_tr_len]
+total_tr_data = X[:total_tr_len]
+total_tr_label = Y[:total_tr_len]
 
-val_data=X[total_tr_len:(total_tr_len+val_len)]
-val_label=Y[total_tr_len:(total_tr_len+val_len)]
+val_data = X[total_tr_len:(total_tr_len + val_len)]
+val_label = Y[total_tr_len:(total_tr_len + val_len)]
 
-te_data=X[(total_tr_len+val_len):(total_tr_len+val_len+te_len)]
-te_label=Y[(total_tr_len+val_len):(total_tr_len+val_len+te_len)]
+te_data = X[(total_tr_len + val_len):(total_tr_len + val_len + te_len)]
+te_label = Y[(total_tr_len + val_len):(total_tr_len + val_len + te_len)]
 
-total_tr_data_tensor=torch.from_numpy(total_tr_data).type(torch.FloatTensor)
-total_tr_label_tensor=torch.from_numpy(total_tr_label).type(torch.LongTensor)
+total_tr_data_tensor = torch.from_numpy(total_tr_data).type(torch.FloatTensor)
+total_tr_label_tensor = torch.from_numpy(total_tr_label).type(torch.LongTensor)
 
-val_data_tensor=torch.from_numpy(val_data).type(torch.FloatTensor)
-val_label_tensor=torch.from_numpy(val_label).type(torch.LongTensor)
+val_data_tensor = torch.from_numpy(val_data).type(torch.FloatTensor)
+val_label_tensor = torch.from_numpy(val_label).type(torch.LongTensor)
 
-te_data_tensor=torch.from_numpy(te_data).type(torch.FloatTensor)
-te_label_tensor=torch.from_numpy(te_label).type(torch.LongTensor)
+te_data_tensor = torch.from_numpy(te_data).type(torch.FloatTensor)
+te_label_tensor = torch.from_numpy(te_label).type(torch.LongTensor)
 
-print('total tr len %d | val len %d | test len %d'%(len(total_tr_data_tensor),len(val_data_tensor),len(te_data_tensor)))
+print('total tr len %d | val len %d | test len %d' % (
+    len(total_tr_data_tensor), len(val_data_tensor), len(te_data_tensor)))
 
-#==============================================================================================================
-
-user_tr_data_tensors=[]
-user_tr_label_tensors=[]
+user_tr_data_tensors = []
+user_tr_label_tensors = []
 
 for i in range(nusers):
-
-    user_tr_data_tensor=torch.from_numpy(total_tr_data[user_tr_len*i:user_tr_len*(i+1)]).type(torch.FloatTensor)
-    user_tr_label_tensor=torch.from_numpy(total_tr_label[user_tr_len*i:user_tr_len*(i+1)]).type(torch.LongTensor)
+    user_tr_data_tensor = torch.from_numpy(total_tr_data[user_tr_len * i:user_tr_len * (i + 1)]).type(torch.FloatTensor)
+    user_tr_label_tensor = torch.from_numpy(total_tr_label[user_tr_len * i:user_tr_len * (i + 1)]).type(
+        torch.LongTensor)
 
     user_tr_data_tensors.append(user_tr_data_tensor)
     user_tr_label_tensors.append(user_tr_label_tensor)
-    print('user %d tr len %d'%(i,len(user_tr_data_tensor)))
+    print('user %d tr len %d' % (i, len(user_tr_data_tensor)))
 
+batch_size = 250
+resume = 0
+schedule = [1000]
+nbatches = user_tr_len // batch_size
 
-
-
-batch_size=250
-resume=0
-schedule=[1000]
-nbatches = user_tr_len//batch_size
-
-gamma=.5
+gamma = .5
 opt = 'sgd'
-fed_lr=0.5
-criterion=nn.CrossEntropyLoss()
+fed_lr = 0.5
+criterion = nn.CrossEntropyLoss()
 use_cuda = torch.cuda.is_available()
 
-aggregation='median'
 multi_k = False
 candidates = []
 
 dev_type = 'std'
-z_values={3:0.69847, 5:0.7054, 8:0.71904, 10:0.72575, 12:0.73891}
-n_attackers=[2]
+z_values = {3: 0.69847, 5: 0.7054, 8: 0.71904, 10: 0.72575, 12: 0.73891}
 
-arch='alexnet'
-chkpt='./'+aggregation
+arch = 'alexnet'
+chkpt = './' + args.topology + '-' + args.aggregation
 
 results = []
 
-for n_attacker in n_attackers:
-    epoch_num = 0
-    best_global_acc = 0
-    best_global_te_acc = 0
+# Keep track of the clients each server reaches
+server_control_dict = {0: [0, 1, 2, 3, 4, 5], 1: [1, 2, 0, 6, 7, 8], 2: [3, 4, 0, 7, 8, 9]}
+# Keep track of weights
+overlap_weight_index = {0: 3, 1: 2, 2: 2, 3: 2, 4: 2, 5: 1, 6: 1, 7: 2, 8: 2, 9: 1}
 
-   # torch.cuda.empty_cache()
-    r=np.arange(user_tr_len)
+epoch_num = 0
+best_global_acc = 0
+best_global_te_acc = 0
 
-    fed_model, _ = return_model(arch, 0.1, 0.9, parallel=False)
-    optimizer_fed = SGD(fed_model.parameters(), lr=fed_lr)
+clients = []
 
-    while epoch_num <= args.epochs:
-        user_grads=[]
-        if not epoch_num and epoch_num%nbatches == 0:
-            np.random.shuffle(r)
-            for i in range(nusers):
-                user_tr_data_tensors[i]=user_tr_data_tensors[i][r]
-                user_tr_label_tensors[i]=user_tr_label_tensors[i][r]
+# Create clients
+print("creating %d clients" % (nusers))
+for i in range(nusers):
+    if i >= args.num_attackers:
+        clients.append(Client(i, False, arch, fed_lr, criterion))
+    else:
+        clients.append(Client(i, True, arch, fed_lr, criterion))
 
-        for i in range(n_attacker, nusers):
+# torch.cuda.empty_cache()
+r = np.arange(user_tr_len)
+while epoch_num < args.epochs:
+    user_grads = []
 
-            inputs = user_tr_data_tensors[i][(epoch_num%nbatches)*batch_size:((epoch_num%nbatches) + 1) * batch_size]
-            targets = user_tr_label_tensors[i][(epoch_num%nbatches)*batch_size:((epoch_num%nbatches) + 1) * batch_size]
+    # Shuffle data for each epoch except the first one
+    if not epoch_num and epoch_num % nbatches == 0:
+        np.random.shuffle(r)
+        for i in range(nusers):
+            user_tr_data_tensors[i] = user_tr_data_tensors[i][r]
+            user_tr_label_tensors[i] = user_tr_label_tensors[i][r]
 
-        #    inputs, targets = inputs.cuda(), targets.cuda()
-            inputs, targets = torch.autograd.Variable(inputs), torch.autograd.Variable(targets)
+    # Iterate over users, excluding attackers
+    for i in range(args.num_attackers, nusers):
+        # Get a batch of inputs and targets for the current user
+        inputs = user_tr_data_tensors[i][
+                 (epoch_num % nbatches) * batch_size:((epoch_num % nbatches) + 1) * batch_size]
+        targets = user_tr_label_tensors[i][
+                  (epoch_num % nbatches) * batch_size:((epoch_num % nbatches) + 1) * batch_size]
 
-            outputs = fed_model(inputs)
-            loss = criterion(outputs, targets)
-            fed_model.zero_grad()
-            loss.backward(retain_graph=True)
+        param_grad = clients[i].train(inputs, targets)
 
-            param_grad=[]
-            for param in fed_model.parameters():
-                param_grad=param.grad.data.view(-1) if not len(param_grad) else torch.cat((param_grad,param.grad.view(-1)))
+        # Concatenate user gradients to the list
+        user_grads = param_grad[None, :] if len(user_grads) == 0 else torch.cat((user_grads, param_grad[None, :]),
+                                                                                0)
 
-            user_grads=param_grad[None, :] if len(user_grads)==0 else torch.cat((user_grads,param_grad[None,:]), 0)
+    # Store the collected user gradients as malicious gradients
+    malicious_grads = user_grads
 
-        malicious_grads = user_grads
+    # Update learning rate of clients
+    for client in clients:
+        client.update_learning_rate(epoch_num, schedule, gamma)
 
-        if epoch_num in schedule:
-            for param_group in optimizer_fed.param_groups:
-                param_group['lr'] *= gamma
-                print('New learnin rate ', param_group['lr'])
+    # Add the parameters of the malicious clients depending on attack type
+    if args.num_attackers > 0:
+        if args.attack == 'lie':
+            mal_update = lie_attack(malicious_grads, z_values[args.num_attackers])
+            malicious_grads = torch.cat((torch.stack([mal_update] * args.num_attackers), malicious_grads))
+        elif args.attack == 'fang':
+            agg_grads = torch.mean(malicious_grads, 0)
+            deviation = torch.sign(agg_grads)
+            malicious_grads = get_malicious_updates_fang_trmean(malicious_grads, deviation, args.num_attackers, epoch_num)
+        elif args.attack == 'agr':
+            agg_grads = torch.mean(malicious_grads, 0)
+            malicious_grads = our_attack_dist(malicious_grads, agg_grads, args.num_attackers, dev_type=dev_type)
 
-        if n_attacker > 0:
-            if args.attack == 'lie':
-                mal_update = lie_attack(malicious_grads, z_values[n_attacker])
-                malicious_grads = torch.cat((torch.stack([mal_update]*n_attacker), malicious_grads))
-            elif args.attack == 'fang':
-                agg_grads = torch.mean(malicious_grads, 0)
-                deviation = torch.sign(agg_grads)
-                malicious_grads = get_malicious_updates_fang_trmean(malicious_grads, deviation, n_attacker, epoch_num)
-            elif args.attack == 'agr':
-                agg_grads = torch.mean(malicious_grads, 0)
-                malicious_grads = agr_attack_median(malicious_grads, agg_grads, n_attacker, dev_type=dev_type)
+    if not epoch_num:
+        print(malicious_grads.shape)
 
-        if not epoch_num :
-            print(malicious_grads.shape)
+    # Store of aggregate gradients for servers
+    server_aggregates = []
 
-        if aggregation=='median':
-            agg_grads=torch.median(malicious_grads,dim=0)[0]
+    if args.topology == 'single':
+        agg = []
+        match args.aggregation:
+            case 'median': agg = torch.median(malicious_grads,dim=0)[0] 
+            case 'average': agg = torch.mean(malicious_grads,dim=0)
+            case 'trmean': agg = tr_mean(malicious_grads, args.num_attackers)
+            case 'krum': # TODO add support for mkrum or aggregation=='mkrum':
+                #multi_k = True if aggregation == 'mkrum' else False
+                if epoch_num == 0: print('multi krum is ', multi_k)
+                agg, krum_candidate = multi_krum(malicious_grads, args.num_attackers, multi_k=multi_k)
+            case 'bulyan': agg, krum_candidate=bulyan(malicious_grads, args.num_attackers)
+            case _: assert (False), 'Unknown aggregation strategy: ' + self.aggregation
+        server_aggregates.append(agg)
+    elif args.topology == 'fedmes':
+        # For each server find the aggregate gradients of clients it reaches
+        for server in server_control_dict.keys():
+            clients_in_reach = []
+            for clientId in server_control_dict[server]:
+                clients_in_reach.append(malicious_grads[clientId])
 
-        elif aggregation=='average':
-            agg_grads=torch.mean(malicious_grads,dim=0)
+            agg_grads = []
+            stacked_clients_in_reach = torch.stack(clients_in_reach, dim=0)
+            if args.aggregation == 'median':
+                agg_grads = fedmes_median(stacked_clients_in_reach, overlap_weight_index)
 
-        elif aggregation=='trmean':
-            agg_grads=tr_mean(malicious_grads, n_attacker)
+            elif args.aggregation == 'average':
+                agg_grads = fedmes_mean(stacked_clients_in_reach, overlap_weight_index)
 
-        elif aggregation=='krum' or aggregation=='mkrum':
-            multi_k = True if aggregation == 'mkrum' else False
-            if epoch_num == 0: print('multi krum is ', multi_k)
-            agg_grads, krum_candidate = multi_krum(malicious_grads, n_attacker, multi_k=multi_k)
+            server_aggregates.append(agg_grads)
+    else:
+        assert (False), 'Unkown topology: ' + args.topology
 
-        elif aggregation=='bulyan':
-            agg_grads, krum_candidate=bulyan(malicious_grads, n_attacker)
+    del user_grads
 
-        del user_grads
+    del malicious_grads
 
-        start_idx=0
+    server_aggregates = torch.stack(server_aggregates, dim=0)
 
-        optimizer_fed.zero_grad()
+    if args.topology == 'single':
+        for c in clients:
+            c.update_model(server_aggregates[0])
+    elif args.topology == 'fedmes':
+        # Update models of clients taking into account the servers that reach it
+        for client in clients:
+            if client.client_idx == 5:
+                client.update_model(server_aggregates[0])
+            elif client.client_idx == 6:
+                client.update_model(server_aggregates[1])
+            elif client.client_idx == 9:
+                client.update_model(server_aggregates[2])
+            elif client.client_idx == 0:
+                comb_all = torch.mean(server_aggregates, dim=0)
+                client.update_model(comb_all)
+            elif client.client_idx in [1, 2]:
+                comb_0_1 = torch.mean(server_aggregates[:2], dim=0)
+                client.update_model(comb_0_1)
+            elif client.client_idx in [7, 8]:
+                comb_1_2 = torch.mean(server_aggregates[1:], dim=0)
+                client.update_model(comb_1_2)
+            elif client.client_idx in [3, 4]:
+                comb_0_2 = torch.mean(server_aggregates[[0, 2]], dim=0)
+                client.update_model(comb_0_2)
 
-        model_grads=[]
+    val_loss, val_acc = test(val_data_tensor, val_label_tensor, clients[0].fed_model, criterion, use_cuda)
+    te_loss, te_acc = test(te_data_tensor, te_label_tensor, clients[0].fed_model, criterion, use_cuda)
 
-        for i, param in enumerate(fed_model.parameters()):
-            param_=agg_grads[start_idx:start_idx+len(param.data.view(-1))].reshape(param.data.shape)
-            start_idx=start_idx+len(param.data.view(-1))
-            param_=param_#.cuda()
-            model_grads.append(param_)
+    is_best = best_global_acc < val_acc
 
-        optimizer_fed.step(model_grads)
+    best_global_acc = max(best_global_acc, val_acc)
 
-        val_loss, val_acc = test(val_data_tensor,val_label_tensor,fed_model,criterion,use_cuda)
-        te_loss, te_acc = test(te_data_tensor,te_label_tensor, fed_model, criterion, use_cuda)
+    if is_best:
+        best_global_te_acc = te_acc
 
-        is_best = best_global_acc < val_acc
+    #print("Acc: " + str(val_acc) + " Loss: " + str(val_loss))
+    results.append([val_acc, val_loss])
+    if epoch_num % 10 == 0 or epoch_num == args.epochs - 1:
+        print('%s, %s: at %s n_at %d e %d fed_model val loss %.4f val acc %.4f best val_acc %f te_acc %f' % (
+            args.topology, args.aggregation, args.attack, args.num_attackers, epoch_num, val_loss, val_acc, best_global_acc,
+            best_global_te_acc))
 
-        best_global_acc = max(best_global_acc, val_acc)
+    if val_loss > 10:
+        print('val loss %f too high' % val_loss)
+        break
 
-        if is_best:
-            best_global_te_acc = te_acc
+    epoch_num += 1
 
-#        print("Acc: " + str(val_acc) + " Loss: " + str(val_loss))
-        results.append([val_acc, val_loss])
-        if epoch_num%10==0 or epoch_num==args.epochs-1:
-            print('%s: at %s n_at %d e %d fed_model val loss %.4f val acc %.4f best val_acc %f te_acc %f'%(aggregation, args.attack, n_attacker, epoch_num, val_loss, val_acc, best_global_acc,best_global_te_acc))
-
-        if val_loss > 10:
-            print('val loss %f too high'%val_loss)
-            break
-
-        epoch_num+=1
-
-print(results)
+#print(results)
 print("Saving to results.csv")
 
-import csv
 with open("results.csv", 'w') as csvfile:
     # creating a csv writer object
     csvwriter = csv.writer(csvfile)
