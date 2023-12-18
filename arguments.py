@@ -7,9 +7,11 @@ class Arguments:
     def __init__(self):
         
         self.dataset = "cifar_10"
+        self.arch = 'alexnet'
         self.batch_size = 250
         self.resume = 0
         self.epochs = 800
+        self.batch_write = 50
 
         self.clients = 10
         self.num_attackers = 0

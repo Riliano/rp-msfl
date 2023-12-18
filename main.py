@@ -8,6 +8,8 @@ import numpy as np
 
 import torch.nn as nn
 
+from utils.misc import get_time_string
+
 from aggregation_fedmes import fedmes_median, fedmes_mean
 from aggregation_single_server import *
 
@@ -96,10 +98,17 @@ candidates = []
 dev_type = 'std'
 z_values = {3: 0.69847, 5: 0.7054, 8: 0.71904, 10: 0.72575, 12: 0.73891}
 
-arch = 'alexnet'
+arch = args.arch
 chkpt = './' + args.topology + '-' + args.aggregation
 
+results_file = './results/' + get_time_string()       + '-'\
+                            + args.topology           + '-'\
+                            + args.aggregation        + '-'\
+                            + str(args.epochs)        +'e-'\
+                            + str(args.num_attackers) + 'att-'\
+                            + args.arch               + '.csv'
 results = []
+print('Results will be saved in: ' + results_file)
 
 # Keep track of the clients each server reaches
 server_control_dict = {0: [0, 1, 2, 3, 4, 5], 1: [1, 2, 0, 6, 7, 8], 2: [3, 4, 0, 7, 8, 9]}
@@ -245,7 +254,7 @@ while epoch_num < args.epochs:
     if is_best:
         best_global_te_acc = te_acc
 
-    #print("Acc: " + str(val_acc) + " Loss: " + str(val_loss))
+    print("Acc: " + str(val_acc) + " Loss: " + str(val_loss))
     results.append([val_acc, val_loss])
     if epoch_num % 10 == 0 or epoch_num == args.epochs - 1:
         print('%s, %s: at %s n_at %d e %d fed_model val loss %.4f val acc %.4f best val_acc %f te_acc %f' % (
@@ -259,9 +268,9 @@ while epoch_num < args.epochs:
     epoch_num += 1
 
 #print(results)
-print("Saving to results.csv")
+print('Saving to ' + results_file)
 
-with open("results.csv", 'w') as csvfile:
+with open(results_file, 'w') as csvfile:
     # creating a csv writer object
     csvwriter = csv.writer(csvfile)
 
