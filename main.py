@@ -109,6 +109,8 @@ results_file = './results/' + get_time_string()       + '-'\
                             + args.arch               + '.csv'
 results = []
 print('Results will be saved in: ' + results_file)
+with open(results_file, 'w') as csvfile:
+    csvwriter = csv.writer(csvfile).writerow(['Accuracy', 'Loss'])
 
 # Keep track of the clients each server reaches
 server_control_dict = {0: [0, 1, 2, 3, 4, 5], 1: [1, 2, 0, 6, 7, 8], 2: [3, 4, 0, 7, 8, 9]}
@@ -261,18 +263,18 @@ while epoch_num < args.epochs:
             args.topology, args.aggregation, args.attack, args.num_attackers, epoch_num, val_loss, val_acc, best_global_acc,
             best_global_te_acc))
 
+    if args.batch_write and epoch_num % args.batch_write == 0:
+        print('Writing next batch of results at e ' + str(epoch_num))
+        with open(results_file, 'a') as csvfile:
+            csv.writer(csvfile).writerows(results)
+            results.clear()
+
     if val_loss > 10:
         print('val loss %f too high' % val_loss)
         break
 
     epoch_num += 1
 
-#print(results)
 print('Saving to ' + results_file)
-
-with open(results_file, 'w') as csvfile:
-    # creating a csv writer object
-    csvwriter = csv.writer(csvfile)
-
-    # writing the data rows
-    csvwriter.writerows(results)
+with open(results_file, 'a') as csvfile:
+    csv.writer(csvfile).writerows(results)

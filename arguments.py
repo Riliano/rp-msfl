@@ -11,6 +11,8 @@ class Arguments:
         self.batch_size = 250
         self.resume = 0
         self.epochs = 800
+
+        # How many epochs before the results are saved, disable with 0
         self.batch_write = 50
 
         self.clients = 10
