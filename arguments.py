@@ -6,11 +6,19 @@ torch.manual_seed(SEED)
 class Arguments:
     def __init__(self):
         
-        self.dataset = "cifar_10"
+        self.dataset = 'cifar_10'
         self.arch = 'alexnet'
         self.batch_size = 250
+        self.schedule = [1000]
+        self.gamma = 0.5
+        self.fed_lr = 0.5
+        self.dev_type = 'std'
+        self.z_values = {3: 0.69847, 5: 0.7054, 8: 0.71904, 10: 0.72575, 12: 0.73891}
+
+
         self.resume = 0
         self.epochs = 800
+
 
         # How many epochs before the results are saved, disable with 0
         self.batch_write = 50

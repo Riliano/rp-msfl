@@ -32,10 +32,9 @@ X = data[0]
 Y = data[1]
 # data loading
 
-nusers = args.clients
 user_tr_len = 2400
 
-total_tr_len = user_tr_len * nusers
+total_tr_len = user_tr_len * args.clients
 val_len = 3300
 te_len = 3300
 
@@ -72,7 +71,7 @@ print('total tr len %d | val len %d | test len %d' % (
 user_tr_data_tensors = []
 user_tr_label_tensors = []
 
-for i in range(nusers):
+for i in range(args.clients):
     user_tr_data_tensor = torch.from_numpy(total_tr_data[user_tr_len * i:user_tr_len * (i + 1)]).type(torch.FloatTensor)
     user_tr_label_tensor = torch.from_numpy(total_tr_label[user_tr_len * i:user_tr_len * (i + 1)]).type(
         torch.LongTensor)
@@ -81,24 +80,13 @@ for i in range(nusers):
     user_tr_label_tensors.append(user_tr_label_tensor)
     print('user %d tr len %d' % (i, len(user_tr_data_tensor)))
 
-batch_size = 250
-resume = 0
-schedule = [1000]
-nbatches = user_tr_len // batch_size
+nbatches = user_tr_len // args.batch_size
 
-gamma = .5
-opt = 'sgd'
-fed_lr = 0.5
 criterion = nn.CrossEntropyLoss()
-use_cuda = torch.cuda.is_available()
 
-multi_k = False
+multi_k = (args.aggregation == 'mkrum')
 candidates = []
 
-dev_type = 'std'
-z_values = {3: 0.69847, 5: 0.7054, 8: 0.71904, 10: 0.72575, 12: 0.73891}
-
-arch = args.arch
 chkpt = './' + args.topology + '-' + args.aggregation
 
 results_file = './results/' + get_time_string()       + '-'\
@@ -124,12 +112,12 @@ best_global_te_acc = 0
 clients = []
 
 # Create clients
-print("creating %d clients" % (nusers))
-for i in range(nusers):
+print("creating %d clients" % (args.clients))
+for i in range(args.clients):
     if i >= args.num_attackers:
-        clients.append(Client(i, False, arch, fed_lr, criterion))
+        clients.append(Client(i, False, args.arch, args.fed_lr, criterion))
     else:
-        clients.append(Client(i, True, arch, fed_lr, criterion))
+        clients.append(Client(i, True, args.arch, args.fed_lr, criterion))
 
 # torch.cuda.empty_cache()
 r = np.arange(user_tr_len)
@@ -139,17 +127,17 @@ while epoch_num < args.epochs:
     # Shuffle data for each epoch except the first one
     if not epoch_num and epoch_num % nbatches == 0:
         np.random.shuffle(r)
-        for i in range(nusers):
+        for i in range(args.clients):
             user_tr_data_tensors[i] = user_tr_data_tensors[i][r]
             user_tr_label_tensors[i] = user_tr_label_tensors[i][r]
 
     # Iterate over users, excluding attackers
-    for i in range(args.num_attackers, nusers):
+    for i in range(args.num_attackers, args.clients):
         # Get a batch of inputs and targets for the current user
         inputs = user_tr_data_tensors[i][
-                 (epoch_num % nbatches) * batch_size:((epoch_num % nbatches) + 1) * batch_size]
+                 (epoch_num % nbatches) * args.batch_size:((epoch_num % nbatches) + 1) * args.batch_size]
         targets = user_tr_label_tensors[i][
-                  (epoch_num % nbatches) * batch_size:((epoch_num % nbatches) + 1) * batch_size]
+                  (epoch_num % nbatches) * args.batch_size:((epoch_num % nbatches) + 1) * args.batch_size]
 
         param_grad = clients[i].train(inputs, targets)
 
@@ -162,12 +150,12 @@ while epoch_num < args.epochs:
 
     # Update learning rate of clients
     for client in clients:
-        client.update_learning_rate(epoch_num, schedule, gamma)
+        client.update_learning_rate(epoch_num, args.schedule, args.gamma)
 
     # Add the parameters of the malicious clients depending on attack type
     if args.num_attackers > 0:
         if args.attack == 'lie':
-            mal_update = lie_attack(malicious_grads, z_values[args.num_attackers])
+            mal_update = lie_attack(malicious_grads, args.z_values[args.num_attackers])
             malicious_grads = torch.cat((torch.stack([mal_update] * args.num_attackers), malicious_grads))
         elif args.attack == 'fang':
             agg_grads = torch.mean(malicious_grads, 0)
@@ -175,7 +163,7 @@ while epoch_num < args.epochs:
             malicious_grads = get_malicious_updates_fang_trmean(malicious_grads, deviation, args.num_attackers, epoch_num)
         elif args.attack == 'agr':
             agg_grads = torch.mean(malicious_grads, 0)
-            malicious_grads = our_attack_dist(malicious_grads, agg_grads, args.num_attackers, dev_type=dev_type)
+            malicious_grads = our_attack_dist(malicious_grads, agg_grads, args.num_attackers, dev_type=args.dev_type)
 
     if not epoch_num:
         print(malicious_grads.shape)
@@ -216,7 +204,6 @@ while epoch_num < args.epochs:
         assert (False), 'Unkown topology: ' + args.topology
 
     del user_grads
-
     del malicious_grads
 
     server_aggregates = torch.stack(server_aggregates, dim=0)
@@ -246,8 +233,8 @@ while epoch_num < args.epochs:
                 comb_0_2 = torch.mean(server_aggregates[[0, 2]], dim=0)
                 client.update_model(comb_0_2)
 
-    val_loss, val_acc = test(val_data_tensor, val_label_tensor, clients[0].fed_model, criterion, use_cuda)
-    te_loss, te_acc = test(te_data_tensor, te_label_tensor, clients[0].fed_model, criterion, use_cuda)
+    val_loss, val_acc = test(val_data_tensor, val_label_tensor, clients[0].fed_model, criterion, args.cuda)
+    te_loss, te_acc = test(te_data_tensor, te_label_tensor, clients[0].fed_model, criterion, args.cuda)
 
     is_best = best_global_acc < val_acc
 
