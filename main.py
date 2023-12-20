@@ -32,12 +32,6 @@ X = data[0]
 Y = data[1]
 # data loading
 
-user_tr_len = 2400
-
-total_tr_len = user_tr_len * args.clients
-val_len = 3300
-te_len = 3300
-
 print('total data len: ', len(X))
 
 if not os.path.isfile('./cifar10_shuffle.pkl'):
@@ -47,14 +41,14 @@ if not os.path.isfile('./cifar10_shuffle.pkl'):
 else:
     all_indices = pickle.load(open('./cifar10_shuffle.pkl', 'rb'))
 
-total_tr_data = X[:total_tr_len]
-total_tr_label = Y[:total_tr_len]
+total_tr_data = X[:args.total_tr_len]
+total_tr_label = Y[:args.total_tr_len]
 
-val_data = X[total_tr_len:(total_tr_len + val_len)]
-val_label = Y[total_tr_len:(total_tr_len + val_len)]
+val_data = X[args.total_tr_len:(args.total_tr_len + args.val_len)]
+val_label = Y[args.total_tr_len:(args.total_tr_len + args.val_len)]
 
-te_data = X[(total_tr_len + val_len):(total_tr_len + val_len + te_len)]
-te_label = Y[(total_tr_len + val_len):(total_tr_len + val_len + te_len)]
+te_data = X[(args.total_tr_len + args.val_len):(args.total_tr_len + args.val_len + args.te_len)]
+te_label = Y[(args.total_tr_len + args.val_len):(args.total_tr_len + args.val_len + args.te_len)]
 
 total_tr_data_tensor = torch.from_numpy(total_tr_data).type(torch.FloatTensor)
 total_tr_label_tensor = torch.from_numpy(total_tr_label).type(torch.LongTensor)
@@ -72,15 +66,15 @@ user_tr_data_tensors = []
 user_tr_label_tensors = []
 
 for i in range(args.clients):
-    user_tr_data_tensor = torch.from_numpy(total_tr_data[user_tr_len * i:user_tr_len * (i + 1)]).type(torch.FloatTensor)
-    user_tr_label_tensor = torch.from_numpy(total_tr_label[user_tr_len * i:user_tr_len * (i + 1)]).type(
+    user_tr_data_tensor = torch.from_numpy(total_tr_data[args.user_tr_len * i:args.user_tr_len * (i + 1)]).type(torch.FloatTensor)
+    user_tr_label_tensor = torch.from_numpy(total_tr_label[args.user_tr_len * i:args.user_tr_len * (i + 1)]).type(
         torch.LongTensor)
 
     user_tr_data_tensors.append(user_tr_data_tensor)
     user_tr_label_tensors.append(user_tr_label_tensor)
     print('user %d tr len %d' % (i, len(user_tr_data_tensor)))
 
-nbatches = user_tr_len // args.batch_size
+nbatches = args.user_tr_len // args.batch_size
 
 criterion = nn.CrossEntropyLoss()
 
@@ -120,7 +114,7 @@ for i in range(args.clients):
         clients.append(Client(i, True, args.arch, args.fed_lr, criterion))
 
 # torch.cuda.empty_cache()
-r = np.arange(user_tr_len)
+r = np.arange(args.user_tr_len)
 while epoch_num < args.epochs:
     user_grads = []
 

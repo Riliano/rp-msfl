@@ -33,8 +33,12 @@ class Arguments:
 
         self.cuda = False
 
-#
-#        if self.dataset == "cifar_10":
+
+        if self.dataset == "cifar_10":
+            self.user_tr_len = 2400
+            self.total_tr_len = self.user_tr_len * self.clients
+            self.val_len = 3300
+            self.te_len = 3300
 #            #self.net = Cifar10CNN
 #            # self.net = Cifar10ResNet
 #
