@@ -19,60 +19,14 @@ from cifar10.sgd import SGD
 
 from arguments import Arguments
 
-from data import load_data
+from data import TrainingTensors, tensor_loader
 
 from attack import min_max_attack, lie_attack, get_malicious_updates_fang_trmean, our_attack_dist
 from client import Client
 
 args = Arguments()
 
-# X, Y = load_data(args)
-data = pickle.load(open('./cifar10_data_ind.pkl', 'rb'))
-X = data[0]
-Y = data[1]
-# data loading
-
-print('total data len: ', len(X))
-
-if not os.path.isfile('./cifar10_shuffle.pkl'):
-    all_indices = np.arange(len(X))
-    np.random.shuffle(all_indices)
-    pickle.dump(all_indices, open('./cifar10_shuffle.pkl', 'wb'))
-else:
-    all_indices = pickle.load(open('./cifar10_shuffle.pkl', 'rb'))
-
-total_tr_data = X[:args.total_tr_len]
-total_tr_label = Y[:args.total_tr_len]
-
-val_data = X[args.total_tr_len:(args.total_tr_len + args.val_len)]
-val_label = Y[args.total_tr_len:(args.total_tr_len + args.val_len)]
-
-te_data = X[(args.total_tr_len + args.val_len):(args.total_tr_len + args.val_len + args.te_len)]
-te_label = Y[(args.total_tr_len + args.val_len):(args.total_tr_len + args.val_len + args.te_len)]
-
-total_tr_data_tensor = torch.from_numpy(total_tr_data).type(torch.FloatTensor)
-total_tr_label_tensor = torch.from_numpy(total_tr_label).type(torch.LongTensor)
-
-val_data_tensor = torch.from_numpy(val_data).type(torch.FloatTensor)
-val_label_tensor = torch.from_numpy(val_label).type(torch.LongTensor)
-
-te_data_tensor = torch.from_numpy(te_data).type(torch.FloatTensor)
-te_label_tensor = torch.from_numpy(te_label).type(torch.LongTensor)
-
-print('total tr len %d | val len %d | test len %d' % (
-    len(total_tr_data_tensor), len(val_data_tensor), len(te_data_tensor)))
-
-user_tr_data_tensors = []
-user_tr_label_tensors = []
-
-for i in range(args.clients):
-    user_tr_data_tensor = torch.from_numpy(total_tr_data[args.user_tr_len * i:args.user_tr_len * (i + 1)]).type(torch.FloatTensor)
-    user_tr_label_tensor = torch.from_numpy(total_tr_label[args.user_tr_len * i:args.user_tr_len * (i + 1)]).type(
-        torch.LongTensor)
-
-    user_tr_data_tensors.append(user_tr_data_tensor)
-    user_tr_label_tensors.append(user_tr_label_tensor)
-    print('user %d tr len %d' % (i, len(user_tr_data_tensor)))
+tensors = tensor_loader(args)
 
 nbatches = args.user_tr_len // args.batch_size
 
@@ -122,15 +76,15 @@ while epoch_num < args.epochs:
     if not epoch_num and epoch_num % nbatches == 0:
         np.random.shuffle(r)
         for i in range(args.clients):
-            user_tr_data_tensors[i] = user_tr_data_tensors[i][r]
-            user_tr_label_tensors[i] = user_tr_label_tensors[i][r]
+            tensors.user_tr_data[i] = tensors.user_tr_data[i][r]
+            tensors.user_tr_label[i] = tensors.user_tr_label[i][r]
 
     # Iterate over users, excluding attackers
     for i in range(args.num_attackers, args.clients):
         # Get a batch of inputs and targets for the current user
-        inputs = user_tr_data_tensors[i][
+        inputs = tensors.user_tr_data[i][
                  (epoch_num % nbatches) * args.batch_size:((epoch_num % nbatches) + 1) * args.batch_size]
-        targets = user_tr_label_tensors[i][
+        targets = tensors.user_tr_label[i][
                   (epoch_num % nbatches) * args.batch_size:((epoch_num % nbatches) + 1) * args.batch_size]
 
         param_grad = clients[i].train(inputs, targets)
@@ -227,8 +181,8 @@ while epoch_num < args.epochs:
                 comb_0_2 = torch.mean(server_aggregates[[0, 2]], dim=0)
                 client.update_model(comb_0_2)
 
-    val_loss, val_acc = test(val_data_tensor, val_label_tensor, clients[0].fed_model, criterion, args.cuda)
-    te_loss, te_acc = test(te_data_tensor, te_label_tensor, clients[0].fed_model, criterion, args.cuda)
+    val_loss, val_acc = test(tensors.val_data, tensors.val_label, clients[0].fed_model, criterion, args.cuda)
+    te_loss, te_acc = test(tensors.te_data, tensors.te_label, clients[0].fed_model, criterion, args.cuda)
 
     is_best = best_global_acc < val_acc
 
