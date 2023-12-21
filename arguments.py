@@ -32,6 +32,7 @@ class Arguments:
         self.attack = "agr"
 
         self.cuda = False
+        self.parallel = True
 
 
         if self.dataset == "cifar_10":

@@ -5,15 +5,16 @@ from cifar10.sgd import SGD
 
 
 class Client:
-    def __init__(self, client_idx, is_mal, model_type, fed_lr, criterion):
+    def __init__(self, client_idx, args, is_mal, criterion):
         self.client_idx = client_idx
+        self.args = args
         self.is_mal = is_mal
-        self.model_type = model_type
-        self.fed_lr = fed_lr
+        self.model_type = self.args.arch
+        self.fed_lr = self.args.fed_lr
         self.criterion = criterion
 
-        self.fed_model, _ = return_model(model_type, 0.1, 0.9, parallel=False)
-        self.optimizer_fed = SGD(self.fed_model.parameters(), lr=fed_lr)
+        self.fed_model, _ = return_model(self.model_type, 0.1, 0.9, parallel=args.parallel, cuda=args.cuda)
+        self.optimizer_fed = SGD(self.fed_model.parameters(), lr=self.fed_lr)
 
     def train(self, inputs, targets):
         # Convert inputs and labels to PyTorch Variables

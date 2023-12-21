@@ -70,8 +70,8 @@ def get_model(config, parallel=True, cuda=False, device=0):
     if parallel:
         model = torch.nn.DataParallel(model)
 
-    #if cuda:
-    #    model.cuda()
+    if cuda:
+        model.cuda()
 
     return model
 

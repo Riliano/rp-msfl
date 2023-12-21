@@ -57,11 +57,12 @@ def run_experiment(args):
     print("creating %d clients" % (args.clients))
     for i in range(args.clients):
         if i >= args.num_attackers:
-            clients.append(Client(i, False, args.arch, args.fed_lr, criterion))
+            clients.append(Client(i, args,  False, criterion))
         else:
-            clients.append(Client(i, True, args.arch, args.fed_lr, criterion))
+            clients.append(Client(i, args, True, criterion))
 
-    # torch.cuda.empty_cache()
+    if args.cuda:
+        torch.cuda.empty_cache()
     r = np.arange(args.user_tr_len)
     while epoch_num < args.epochs:
         user_grads = []
@@ -185,7 +186,7 @@ def run_experiment(args):
         if is_best:
             best_global_te_acc = te_acc
 
-        print("Acc: " + str(val_acc) + " Loss: " + str(val_loss))
+        #print("Acc: " + str(val_acc) + " Loss: " + str(val_loss))
         results.append([val_acc, val_loss])
         if epoch_num % 10 == 0 or epoch_num == args.epochs - 1:
             print('%s, %s: at %s n_at %d e %d fed_model val loss %.4f val acc %.4f best val_acc %f te_acc %f' % (
