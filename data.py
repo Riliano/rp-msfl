@@ -7,12 +7,15 @@ import torchvision.datasets as datasets
 
 from arguments import Arguments
 
+shuffle_file = './storage/cifar10_shuffle.pkl'
 
 def load_data(args):
-    data_loc = './utils'
+    data_loc = './storage'
     # load the train dataset
 
     train_transform = transforms.Compose([
+#        transforms.Resize(256),
+#        transforms.CenterCrop(224), # alexnet preprocessing - expensive
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
@@ -36,12 +39,12 @@ def load_data(args):
 
     print('total data len: ', len(X))
 
-    if not os.path.isfile('./cifar10_shuffle.pkl'):
+    if not os.path.isfile(shuffle_file):
         all_indices = np.arange(len(X))
         np.random.shuffle(all_indices)
-        pickle.dump(all_indices, open('./cifar10_shuffle.pkl', 'wb'))
+        pickle.dump(all_indices, open(shuffle_file, 'wb'))
     else:
-        all_indices = pickle.load(open('./cifar10_shuffle.pkl', 'rb'))
+        all_indices = pickle.load(open(shuffle_file, 'rb'))
 
     X = X[all_indices]
     Y = Y[all_indices]
@@ -59,19 +62,19 @@ class TrainingTensors:
 
 def tensor_loader(args):
 
-    data = pickle.load(open('./cifar10_data_ind.pkl', 'rb'))
+    data = pickle.load(open('./storage/cifar10_data_ind.pkl', 'rb'))
     X = data[0]
     Y = data[1]
     # data loading
 
     print('total data len: ', len(X))
 
-    if not os.path.isfile('./cifar10_shuffle.pkl'):
+    if not os.path.isfile(shuffle_file):
         all_indices = np.arange(len(X))
         np.random.shuffle(all_indices)
-        pickle.dump(all_indices, open('./cifar10_shuffle.pkl', 'wb'))
+        pickle.dump(all_indices, open(shuffle_file, 'wb'))
     else:
-        all_indices = pickle.load(open('./cifar10_shuffle.pkl', 'rb'))
+        all_indices = pickle.load(open(shuffle_file, 'rb'))
 
     total_tr_data = X[:args.total_tr_len]
     total_tr_label = Y[:args.total_tr_len]
@@ -118,7 +121,7 @@ def tensor_loader(args):
 def main():
     print("Hello")
     X, Y = load_data(Arguments())
-    pickle.dump([X, Y], open('./cifar10_data_ind.pkl', 'wb'))
+    pickle.dump([X, Y], open('./storage/cifar10_data_ind.pkl', 'wb'))
 
 
 if __name__ == "__main__":
