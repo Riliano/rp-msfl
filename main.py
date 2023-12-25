@@ -4,7 +4,7 @@ from arguments import Arguments
 def main():
 
     args1 = Arguments()
-    args1.epochs = 50
+#    args1.epochs = 50
 #    args2 = Arguments()
 #    args2.epochs = 1500
 #    args2.topology = 'single'

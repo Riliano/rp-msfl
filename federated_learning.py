@@ -213,7 +213,6 @@ def run_experiment(args):
 
 
     print('Saving to ' + results_file)
-
     if args.batch_write:
         with open(results_file, 'a') as csvfile:
             csv.writer(csvfile).writerows(results)
@@ -222,3 +221,10 @@ def run_experiment(args):
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(['Accuracy', 'Loss'])
             csvwriter.writerows(results)
+    if args.save_final_model:
+        weights_file = './pretrained/' + get_time_string() + '-'\
+                                       + args.arch         + '-'\
+                                       + args.dataset      + '-'\
+                                       + str(args.epochs)  + '.zip'
+        print('Saving weights to ' + weights_file)
+        torch.save(clients[0].fed_model.state_dict(), weights_file)

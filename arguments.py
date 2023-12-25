@@ -7,39 +7,44 @@ class Arguments:
     def __init__(self):
         
         self.dataset = 'cifar_10'
-        self.arch = 'alexnet'
+        self.arch = 'alexnet' # 'alexnet', 'vgg11'
+
+        self.load_pretrained_weights = True
+        self.pretrained_weights_file = './pretrained/model-alexnet.zip'
+        self.save_final_model = False
+
         self.batch_size = 250
         self.schedule = [1000]
         self.gamma = 0.5
-        self.fed_lr = 0.5
+        self.fed_lr = 0.2
         self.dev_type = 'std'
         self.z_values = {3: 0.69847, 5: 0.7054, 8: 0.71904, 10: 0.72575, 12: 0.73891}
 
 
         self.resume = 0
-        self.epochs = 800
+        self.epochs = 50
 
 
         # How many epochs before the results are saved, disable with 0
-        self.batch_write = 50
+        self.batch_write = 0
 
         self.clients = 10
         self.num_attackers = 0
 
-        self.topology = "fedmes" # "single", "fedmes"
-        self.aggregation = "average" # "average", "median"
+        self.topology = 'single' # 'single', 'fedmes'
+        self.aggregation = 'average' # 'average', 'median'
 
-        self.attack = "agr"
+        self.attack = 'agr'
 
         self.cuda = False
         self.parallel = True
 
 
         if self.dataset == "cifar_10":
-            self.user_tr_len = 2400
+            self.user_tr_len = 3000
             self.total_tr_len = self.user_tr_len * self.clients
-            self.val_len = 3300
-            self.te_len = 3300
+            self.val_len = 3000 * 5
+            self.te_len = 3000 * 5
 #            #self.net = Cifar10CNN
 #            # self.net = Cifar10ResNet
 #

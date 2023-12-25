@@ -16,6 +16,10 @@ class Client:
         self.fed_model, _ = return_model(self.model_type, 0.1, 0.9, parallel=args.parallel, cuda=args.cuda)
         self.optimizer_fed = SGD(self.fed_model.parameters(), lr=self.fed_lr)
 
+        if (args.load_pretrained_weights):
+            print('Loading pretrained weights from: ' + args.pretrained_weights_file)
+            self.fed_model.load_state_dict(torch.load(args.pretrained_weights_file), strict=False)
+
     def train(self, inputs, targets):
         # Convert inputs and labels to PyTorch Variables
         inputs, targets = torch.autograd.Variable(inputs), torch.autograd.Variable(targets)

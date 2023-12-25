@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.parallel
 import torch.optim as optim
 import models.cifar as models
+#from torchvision import models as torchmodels
 
 
 
@@ -77,7 +78,12 @@ def get_model(config, parallel=True, cuda=False, device=0):
 
 
 def return_model(model_name, lr, momentum, parallel=False, cuda=True, device=0):
-    if model_name == 'dc':
+
+    if model_name == 'resnet-pretrained':
+        assert (False), 'Not Implemented'
+        #model = torch.hub.load('chenyaofo/pytorch-cifar-models', 'cifar10_resnet32', pretrained=True)
+        #optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
+    elif model_name == 'dc':
         arch_config = {
             'arch': 'Dc',
             'num_classes': 10,
