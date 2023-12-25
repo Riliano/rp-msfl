@@ -38,9 +38,10 @@ def run_experiment(args):
                                 + str(args.num_attackers) + 'att-'\
                                 + args.arch               + '.csv'
     results = []
-    print('Results will be saved in: ' + results_file)
-    with open(results_file, 'w') as csvfile:
-        csvwriter = csv.writer(csvfile).writerow(['Accuracy', 'Loss'])
+    if args.batch_write:
+        print('Results will be saved in: ' + results_file)
+        with open(results_file, 'w') as csvfile:
+            csv.writer(csvfile).writerow(['Accuracy', 'Loss'])
 
     # Keep track of the clients each server reaches
     server_control_dict = {0: [0, 1, 2, 3, 4, 5], 1: [1, 2, 0, 6, 7, 8], 2: [3, 4, 0, 7, 8, 9]}
@@ -209,6 +210,15 @@ def run_experiment(args):
 
         epoch_num += 1
 
+
+
     print('Saving to ' + results_file)
-    with open(results_file, 'a') as csvfile:
-        csv.writer(csvfile).writerows(results)
+
+    if args.batch_write:
+        with open(results_file, 'a') as csvfile:
+            csv.writer(csvfile).writerows(results)
+    else:
+        with open(results_file, 'w') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerow(['Accuracy', 'Loss'])
+            csvwriter.writerows(results)
