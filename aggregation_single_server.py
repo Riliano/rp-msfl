@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 
 def bulyan(all_updates, n_attackers):

@@ -116,16 +116,20 @@ def run_experiment(args):
 
         if args.topology == 'single':
             agg = []
-            match args.aggregation:
-                case 'median': agg = torch.median(malicious_grads,dim=0)[0] 
-                case 'average': agg = torch.mean(malicious_grads,dim=0)
-                case 'trmean': agg = tr_mean(malicious_grads, args.num_attackers)
-                case 'krum': # TODO add support for mkrum or aggregation=='mkrum':
-                    #multi_k = True if aggregation == 'mkrum' else False
-                    if epoch_num == 0: print('multi krum is ', multi_k)
-                    agg, krum_candidate = multi_krum(malicious_grads, args.num_attackers, multi_k=multi_k)
-                case 'bulyan': agg, krum_candidate=bulyan(malicious_grads, args.num_attackers)
-                case _: assert (False), 'Unknown aggregation strategy: ' + self.aggregation
+            if args.aggregation == 'median':
+                agg = torch.median(malicious_grads,dim=0)[0]
+            elif args.aggregation == 'average':
+                agg = torch.mean(malicious_grads,dim=0)
+            elif args.aggregation == 'trmean':
+                agg = tr_mean(malicious_grads, args.num_attackers)
+            elif args.aggregation == 'krum' or args.aggregation == 'mkrum':
+                multi_k = True if args.aggregation == 'mkrum' else False
+                if epoch_num == 0: print('multi krum is ', multi_k)
+                agg, krum_candidate = multi_krum(malicious_grads, args.num_attackers, multi_k=multi_k)
+            elif args.aggregation == 'bulyan':
+                agg, krum_candidate=bulyan(malicious_grads, args.num_attackers)
+            else:
+                assert (False), 'Unknown aggregation strategy: ' + self.aggregation
             server_aggregates.append(agg)
         elif args.topology == 'fedmes':
             # For each server find the aggregate gradients of clients it reaches
@@ -186,7 +190,7 @@ def run_experiment(args):
         if is_best:
             best_global_te_acc = te_acc
 
-        #print("Acc: " + str(val_acc) + " Loss: " + str(val_loss))
+        print("Acc: " + str(val_acc) + " Loss: " + str(val_loss))
         results.append([val_acc, val_loss])
         if epoch_num % 10 == 0 or epoch_num == args.epochs - 1:
             print('%s, %s: at %s n_at %d e %d fed_model val loss %.4f val acc %.4f best val_acc %f te_acc %f' % (
