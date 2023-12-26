@@ -3,11 +3,9 @@ from __future__ import print_function
 import torch
 import torch.nn as nn
 import torch.nn.parallel
-import torch.optim as optim
 import models.cifar as models
-#from torchvision import models as torchmodels
-
-
+from cifar10.sgd import SGD
+from cifar10.adam import Adam
 
 class cifar_mlp(nn.Module):
     def __init__(self, ninputs=3 * 32 * 32, num_classes=10):
@@ -29,7 +27,6 @@ class cifar_mlp(nn.Module):
         x = x.view(-1, self.ninputs)
         hidden_out = self.features(x)
         return self.classifier(hidden_out)
-
 
 def get_model(config, parallel=True, cuda=False, device=0):
     # print("==> creating model '{}'".format(config['arch']))
@@ -78,18 +75,16 @@ def get_model(config, parallel=True, cuda=False, device=0):
 
 
 def return_model(model_name, lr, momentum, parallel=False, cuda=True, device=0):
-
     if model_name == 'resnet-pretrained':
-        assert (False), 'Not Implemented'
-        #model = torch.hub.load('chenyaofo/pytorch-cifar-models', 'cifar10_resnet32', pretrained=True)
-        #optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
+        model = torch.hub.load('chenyaofo/pytorch-cifar-models', 'cifar10_resnet32', pretrained=True)
+        optimizer = Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
     elif model_name == 'dc':
         arch_config = {
             'arch': 'Dc',
             'num_classes': 10,
         }
         model = get_model(arch_config, parallel=parallel, cuda=cuda, device=device)
-        optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=momentum)
+        optimizer = SGD(model.parameters(), lr=0.001, momentum=momentum)
 
     elif model_name == 'alexnet':
         arch_config = {
@@ -97,7 +92,7 @@ def return_model(model_name, lr, momentum, parallel=False, cuda=True, device=0):
             'num_classes': 10,
         }
         model = get_model(arch_config, parallel=parallel, cuda=cuda, device=device)
-        optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=momentum)
+        optimizer = SGD(model.parameters(), lr=0.001, momentum=momentum)
     elif model_name == 'densenet-bc-100-12':
         arch_config = {
             'arch': 'densenet',
@@ -108,8 +103,8 @@ def return_model(model_name, lr, momentum, parallel=False, cuda=True, device=0):
             'num_classes': 10,
         }
         model = get_model(arch_config, parallel=parallel, cuda=cuda, device=device)
-        # optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=momentum,weight_decay=1e-4)
-        optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
+        # optimizer = SGD(model.parameters(), lr=0.1, momentum=momentum,weight_decay=1e-4)
+        optimizer = Adam(model.parameters(), lr=lr, weight_decay=1e-5)
     elif model_name == 'densenet-bc-L190-k40':
         arch_config = {
             'arch': 'densenet',
@@ -120,7 +115,7 @@ def return_model(model_name, lr, momentum, parallel=False, cuda=True, device=0):
             'num_classes': 10,
         }
         model = get_model(arch_config, parallel=parallel, cuda=cuda, device=device)
-        optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=1e-4)
+        optimizer = SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=1e-4)
     elif model_name == 'preresnet-110':
         arch_config = {
             'arch': 'preresnet',
@@ -128,8 +123,8 @@ def return_model(model_name, lr, momentum, parallel=False, cuda=True, device=0):
             'num_classes': 10,
         }
         model = get_model(arch_config, parallel=parallel, cuda=cuda, device=device)
-        # optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=momentum, weight_decay=1e-4)
-        optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
+        # optimizer = SGD(model.parameters(), lr=0.1, momentum=momentum, weight_decay=1e-4)
+        optimizer = Adam(model.parameters(), lr=lr, weight_decay=1e-5)
     elif model_name == 'resnet-110':
         arch_config = {
             'arch': 'resnet',
@@ -137,8 +132,8 @@ def return_model(model_name, lr, momentum, parallel=False, cuda=True, device=0):
             'num_classes': 10,
         }
         model = get_model(arch_config, parallel=parallel, cuda=cuda, device=device)
-        # optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=1e-4)
-        optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
+        # optimizer = SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=1e-4)
+        optimizer = Adam(model.parameters(), lr=lr, weight_decay=1e-5)
     elif model_name == 'resnext-16x64d':
         arch_config = {
             'arch': 'resnext',
@@ -149,7 +144,7 @@ def return_model(model_name, lr, momentum, parallel=False, cuda=True, device=0):
             'num_classes': 10,
         }
         model = get_model(arch_config, parallel=parallel, cuda=cuda, device=device)
-        optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=5e-4)
+        optimizer = SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=5e-4)
     elif model_name == 'resnext-8x64d':
         arch_config = {
             'arch': 'resnext',
@@ -160,14 +155,14 @@ def return_model(model_name, lr, momentum, parallel=False, cuda=True, device=0):
             'num_classes': 10,
         }
         model = get_model(arch_config, parallel=parallel, cuda=cuda, device=device)
-        optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=5e-4)
+        optimizer = SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=5e-4)
     elif model_name.startswith('vgg'):
         arch_config = {
             'arch': model_name,
             'num_classes': 10,
         }
         model = get_model(arch_config, parallel=parallel, cuda=cuda, device=device)
-        optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum)
+        optimizer = SGD(model.parameters(), lr=lr, momentum=momentum)
     elif model_name == 'WRN-28-10-drop':
         arch_config = {
             'arch': 'wrn',
@@ -177,7 +172,7 @@ def return_model(model_name, lr, momentum, parallel=False, cuda=True, device=0):
             'num_classes': 10,
         }
         model = get_model(arch_config, parallel=parallel, cuda=cuda, device=device)
-        optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=5e-4)
+        optimizer = SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=5e-4)
     else:
         assert (False), 'Model not found!'
 

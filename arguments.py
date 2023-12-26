@@ -7,7 +7,7 @@ class Arguments:
     def __init__(self):
         
         self.dataset = 'cifar_10'
-        self.arch = 'alexnet' # 'alexnet', 'vgg11'
+        self.arch = 'alexnet' # 'alexnet', 'vgg11', 'resnet-pretrained'
 
         self.load_pretrained_weights = True
         self.pretrained_weights_file = './pretrained/model-alexnet.zip'

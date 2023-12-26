@@ -1,8 +1,5 @@
 import torch
-
 from cifar10.cifar10_models import return_model
-from cifar10.sgd import SGD
-
 
 class Client:
     def __init__(self, client_idx, args, is_mal, criterion):
@@ -13,9 +10,11 @@ class Client:
         self.fed_lr = self.args.fed_lr
         self.criterion = criterion
 
-        self.fed_model, _ = return_model(self.model_type, 0.1, 0.9, parallel=args.parallel, cuda=args.cuda)
-        self.optimizer_fed = SGD(self.fed_model.parameters(), lr=self.fed_lr)
-
+        self.fed_model, self.optimizer_fed = return_model(self.model_type,\
+                                                          lr=args.fed_lr,\
+                                                          momentum=0.9,\
+                                                          parallel=args.parallel,\
+                                                          cuda=args.cuda)
         if (args.load_pretrained_weights):
             print('Loading pretrained weights from: ' + args.pretrained_weights_file)
             self.fed_model.load_state_dict(torch.load(args.pretrained_weights_file), strict=False)

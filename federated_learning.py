@@ -8,8 +8,6 @@ import numpy as np
 import torch.nn as nn
 
 from cifar10.cifar10_normal_train import *
-from cifar10.cifar10_models import *
-from cifar10.sgd import SGD
 
 from utils.misc import get_time_string
 from arguments import Arguments
@@ -143,7 +141,6 @@ def run_experiment(args):
                 stacked_clients_in_reach = torch.stack(clients_in_reach, dim=0)
                 if args.aggregation == 'median':
                     agg_grads = fedmes_median(stacked_clients_in_reach, overlap_weight_index)
-
                 elif args.aggregation == 'average':
                     agg_grads = fedmes_mean(stacked_clients_in_reach, overlap_weight_index)
 
