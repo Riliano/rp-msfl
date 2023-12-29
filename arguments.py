@@ -29,7 +29,7 @@ class Arguments:
 
         self.resume = 0
         self.epochs = 50
-        self.epochs_before_attack = 10
+        self.epochs_before_attack = 0
 
         # How many epochs before the results are saved, disable with 0
         self.batch_write = 0
@@ -40,7 +40,7 @@ class Arguments:
         self.topology = 'single' # 'single', 'fedmes'
         self.aggregation = 'average' # 'average', 'median'
 
-        self.attack = 'minmax' # 'minmax', 'fang', 'lie'
+        self.attack = 'veiled-minmax' # 'minmax', 'fang', 'lie', 'veiled-minmax'
 
         self.cuda = False
         self.parallel = True

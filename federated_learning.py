@@ -15,7 +15,7 @@ from data import TrainingTensors, tensor_loader
 
 from aggregation_fedmes import fedmes_median, fedmes_mean
 from aggregation_single_server import *
-from attack import min_max_attack, lie_attack, get_malicious_updates_fang_trmean, minmax_ndss
+from attack import min_max_attack, lie_attack, get_malicious_updates_fang_trmean, minmax_ndss, veiled_minmax
 from client import Client
 
 def run_experiment(args):
@@ -34,6 +34,7 @@ def run_experiment(args):
                                 + args.aggregation        + '-'\
                                 + str(args.epochs)        +'e-'\
                                 + str(args.num_attackers) + 'att-'\
+                                + args.attack             + '-'\
                                 + args.arch               + '.csv'
     results = []
     if args.batch_write:
@@ -80,7 +81,8 @@ def run_experiment(args):
                 tensors.user_tr_label[i] = tensors.user_tr_label[i][r]
 
         # Iterate over users, excluding attackers
-        for i in range(args.num_attackers, args.clients):
+#        for i in range(args.num_attackers, args.clients):
+        for i in range(0, args.clients):
             # Get a batch of inputs and targets for the current user
             inputs = tensors.user_tr_data[i][
                      (epoch_num % nbatches) * args.batch_size:((epoch_num % nbatches) + 1) * args.batch_size]
@@ -112,6 +114,26 @@ def run_experiment(args):
             elif args.attack == 'minmax':
                 agg_grads = torch.mean(malicious_grads, 0)
                 malicious_grads = minmax_ndss(malicious_grads, agg_grads, args.num_attackers, dev_type=args.dev_type)
+            elif args.attack == 'veiled-minmax' and epoch_num:
+                for c in clients:
+                    if c.is_mal:
+                        ids_in_reach = []
+                        for k in server_control_dict:
+                            if c.client_idx in server_control_dict[k]:
+                                ids_in_reach = ids_in_reach + server_control_dict[k]
+
+                        ids_in_reach = list(set(ids_in_reach))
+                        print('reach of ' + str(c.client_idx))
+                        print(ids_in_reach)
+                        agg_grads = []
+                        for i in ids_in_reach:
+                            # That could lead to a bug where the malicious grads of lower id clients
+                            # are considered as if they're their honest one, but we'll ignore this for now
+                            agg_grads.append(malicious_grads[i])
+                        agg_grads = torch.stack(agg_grads, 0)
+                        m_grad = veiled_minmax(agg_grads, c.previous_agg_grads, dev_type=args.dev_type)
+                        malicious_grads[c.client_idx] = m_grad
+
 
         if not epoch_num:
             print(malicious_grads.shape)

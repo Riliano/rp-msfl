@@ -40,6 +40,7 @@ class Client:
         return param_grad
 
     def update_model(self, agg_grads):
+        self.previous_agg_grads = agg_grads
         # Initialize the starting index for aggregating gradients
         start_idx = 0
 
