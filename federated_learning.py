@@ -60,12 +60,18 @@ def run_experiment(args):
         else:
             clients.append(Client(i, args, True, criterion))
 
+    num_attackers = args.num_attackers
+    args.num_attackers = 0
     if args.cuda:
         torch.cuda.empty_cache()
     r = np.arange(args.user_tr_len)
     while epoch_num < args.epochs:
         user_grads = []
 
+        if epoch_num == args.epochs_before_attack:
+            if num_attackers > 0:
+                print('Activating malicious clients')
+            args.num_attackers = num_attackers
         # Shuffle data for each epoch except the first one
         if not epoch_num and epoch_num % nbatches == 0:
             np.random.shuffle(r)
@@ -208,7 +214,6 @@ def run_experiment(args):
         epoch_num += 1
 
 
-
     print('Saving to ' + results_file)
     if args.batch_write:
         with open(results_file, 'a') as csvfile:
@@ -225,3 +230,4 @@ def run_experiment(args):
                                        + str(args.epochs)  + '.zip'
         print('Saving weights to ' + weights_file)
         torch.save(clients[0].fed_model.state_dict(), weights_file)
+    print('Done')
