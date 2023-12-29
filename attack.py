@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 
 def get_malicious_updates_fang_trmean(all_updates, deviation, n_attackers, epoch_num, compression='none', q_level=2,
@@ -6,8 +7,8 @@ def get_malicious_updates_fang_trmean(all_updates, deviation, n_attackers, epoch
     max_vector = torch.max(all_updates, 0)[0]
     min_vector = torch.min(all_updates, 0)[0]
 
-    max_ = (max_vector > 0).type(torch.FloatTensor).cuda()
-    min_ = (min_vector < 0).type(torch.FloatTensor).cuda()
+    max_ = (max_vector > 0).type(torch.FloatTensor) #.cuda()
+    min_ = (min_vector < 0).type(torch.FloatTensor) #.cuda()
 
     max_[max_ == 1] = b
     max_[max_ == 0] = 1 / b
@@ -17,7 +18,7 @@ def get_malicious_updates_fang_trmean(all_updates, deviation, n_attackers, epoch
     max_range = torch.cat((max_vector[:, None], (max_vector * max_)[:, None]), dim=1)
     min_range = torch.cat(((min_vector * min_)[:, None], min_vector[:, None]), dim=1)
 
-    rand = torch.from_numpy(np.random.uniform(0, 1, [len(deviation), n_attackers])).type(torch.FloatTensor).cuda()
+    rand = torch.from_numpy(np.random.uniform(0, 1, [len(deviation), n_attackers])).type(torch.FloatTensor) #.cuda()
 
     max_rand = torch.stack([max_range[:, 0]] * rand.shape[1]).T + rand * torch.stack(
         [max_range[:, 1] - max_range[:, 0]] * rand.shape[1]).T
@@ -25,8 +26,8 @@ def get_malicious_updates_fang_trmean(all_updates, deviation, n_attackers, epoch
         [min_range[:, 1] - min_range[:, 0]] * rand.shape[1]).T
 
     mal_vec = (torch.stack(
-        [(deviation > 0).type(torch.FloatTensor)] * max_rand.shape[1]).T.cuda() * max_rand + torch.stack(
-        [(deviation > 0).type(torch.FloatTensor)] * min_rand.shape[1]).T.cuda() * min_rand).T
+        [(deviation > 0).type(torch.FloatTensor)] * max_rand.shape[1]).T * max_rand + torch.stack( # WAS: T.cuda()
+        [(deviation > 0).type(torch.FloatTensor)] * min_rand.shape[1]).T * min_rand).T
 
     quant_mal_vec = []
     if compression != 'none':
@@ -93,8 +94,7 @@ def min_max_attack(all_updates, model_re, n_attackers, dev_type='unit_vec'):
 MIN-MAX attack
 '''
 
-
-def our_attack_dist(all_updates, model_re, n_attackers, dev_type='unit_vec', threshold=30):
+def minmax_ndss(all_updates, model_re, n_attackers, dev_type='unit_vec', threshold=30):
     if dev_type == 'unit_vec':
         deviation = model_re / torch.norm(model_re)  # unit vector, dir opp to good dir
     elif dev_type == 'sign':

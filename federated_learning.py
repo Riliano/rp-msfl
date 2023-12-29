@@ -15,7 +15,7 @@ from data import TrainingTensors, tensor_loader
 
 from aggregation_fedmes import fedmes_median, fedmes_mean
 from aggregation_single_server import *
-from attack import min_max_attack, lie_attack, get_malicious_updates_fang_trmean, our_attack_dist
+from attack import min_max_attack, lie_attack, get_malicious_updates_fang_trmean, minmax_ndss
 from client import Client
 
 def run_experiment(args):
@@ -109,9 +109,9 @@ def run_experiment(args):
                 agg_grads = torch.mean(malicious_grads, 0)
                 deviation = torch.sign(agg_grads)
                 malicious_grads = get_malicious_updates_fang_trmean(malicious_grads, deviation, args.num_attackers, epoch_num)
-            elif args.attack == 'agr':
+            elif args.attack == 'minmax':
                 agg_grads = torch.mean(malicious_grads, 0)
-                malicious_grads = our_attack_dist(malicious_grads, agg_grads, args.num_attackers, dev_type=args.dev_type)
+                malicious_grads = minmax_ndss(malicious_grads, agg_grads, args.num_attackers, dev_type=args.dev_type)
 
         if not epoch_num:
             print(malicious_grads.shape)

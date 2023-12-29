@@ -21,7 +21,10 @@ class Arguments:
             self.fed_lr = 0.00012
 
         self.dev_type = 'std'
-        self.z_values = {3: 0.69847, 5: 0.7054, 8: 0.71904, 10: 0.72575, 12: 0.73891}
+        # Those values are taken from code with 50 clients, likely they need to be recomputed
+        # See LIE attack paper(A Little Is Enough, Baruch et al) for more details
+        # 1 and 2 are based on guessing and skimming the formulas
+        self.z_values = {1: 0.7054, 2: 0.72575, 3: 0.69847, 5: 0.7054, 8: 0.71904, 10: 0.72575, 12: 0.73891}
 
 
         self.resume = 0
@@ -32,12 +35,12 @@ class Arguments:
         self.batch_write = 0
 
         self.clients = 10
-        self.num_attackers = 0
+        self.num_attackers = 2
 
         self.topology = 'single' # 'single', 'fedmes'
         self.aggregation = 'average' # 'average', 'median'
 
-        self.attack = 'agr'
+        self.attack = 'minmax' # 'minmax', 'fang', 'lie'
 
         self.cuda = False
         self.parallel = True
