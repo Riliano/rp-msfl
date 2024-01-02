@@ -47,7 +47,7 @@ class Arguments:
         self.topology = 'single' # 'single', 'fedmes'
         self.aggregation = 'average' # 'average', 'median'
 
-        self.attack = 'veiled-minmax' # 'minmax', 'fang', 'lie', 'veiled-minmax'
+        self.attack = 'minmax' # 'minmax', 'fang', 'lie', 'veiled-minmax'
 
         self.cuda = False
         self.parallel = True
