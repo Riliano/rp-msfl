@@ -102,6 +102,13 @@ def run_experiment(args):
         # Store the collected user gradients as malicious gradients
         malicious_grads = user_grads
 
+        # Collect the gradients from all benign clients
+        clean_grads = []
+        for c in clients:
+            if not c.is_mal:
+                clean_grads.append(user_grads[c.client_idx])
+        clean_grads = torch.stack(clean_grads, 0)
+
         # Update learning rate of clients
         for client in clients:
             client.update_learning_rate(epoch_num, args.schedule, args.gamma)
@@ -109,15 +116,15 @@ def run_experiment(args):
         # Add the parameters of the malicious clients depending on attack type
         if args.num_attackers > 0:
             if args.attack == 'lie':
-                mal_update = lie_attack(malicious_grads, args.z_values[args.num_attackers])
-                malicious_grads = torch.cat((torch.stack([mal_update] * args.num_attackers), malicious_grads))
+                mal_update = lie_attack(clean_grads, args.z_values[args.num_attackers])
+                malicious_grads = torch.cat((torch.stack([mal_update] * args.num_attackers), clean_grads))
             elif args.attack == 'fang':
-                agg_grads = torch.mean(malicious_grads, 0)
+                agg_grads = torch.mean(clean_grads, 0)
                 deviation = torch.sign(agg_grads)
-                malicious_grads = get_malicious_updates_fang_trmean(malicious_grads, deviation, args.num_attackers, epoch_num)
+                malicious_grads = get_malicious_updates_fang_trmean(clean_grads, deviation, args.num_attackers, epoch_num)
             elif args.attack == 'minmax':
-                agg_grads = torch.mean(malicious_grads, 0)
-                malicious_grads = minmax_ndss(malicious_grads, agg_grads, args.num_attackers, dev_type=args.dev_type)
+                agg_grads = torch.mean(clean_grads, 0)
+                malicious_grads = minmax_ndss(clean_grads, agg_grads, args.num_attackers, dev_type=args.dev_type)
             elif args.attack == 'veiled-minmax' and epoch_num:
                 # Store the malicious gradients in a dict, so that it's updated all at once
                 # in the case of multiple attackers

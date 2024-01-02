@@ -3,10 +3,6 @@ import torch
 
 def get_malicious_updates_fang_trmean(all_updates, deviation, n_attackers, epoch_num, compression='none', q_level=2,
                                       norm='inf'):
-    # Hack in order to get the attack working normally, while changing how
-    # the user gradiants are shared in federated_learning.py
-    all_updates = all_updates[n_attackers:]
-
     b = 2
     max_vector = torch.max(all_updates, 0)[0]
     min_vector = torch.min(all_updates, 0)[0]
@@ -50,19 +46,11 @@ def get_malicious_updates_fang_trmean(all_updates, deviation, n_attackers, epoch
 
 
 def lie_attack(all_updates, z):
-    # Hack in order to get the attack working normally, while changing how
-    # the user gradiants are shared in federated_learning.py
-    all_updates = all_updates[n_attackers:]
-
     avg = torch.mean(all_updates, dim=0)
     std = torch.std(all_updates, dim=0)
     return avg + z * std
 
 def min_max_attack(all_updates, model_re, n_attackers, dev_type='unit_vec'):
-    # Hack in order to get the attack working normally, while changing how
-    # the user gradiants are shared in federated_learning.py
-    all_updates = all_updates[n_attackers:]
-
     if dev_type == 'unit_vec':
         deviation = model_re / torch.norm(model_re)  # unit vector, dir opp to good dir
     elif dev_type == 'sign':
@@ -107,10 +95,6 @@ MIN-MAX attack
 '''
 
 def minmax_ndss(all_updates, model_re, n_attackers, dev_type='unit_vec', threshold=30):
-    # Hack in order to get the attack working normally, while changing how
-    # the user gradiants are shared in federated_learning.py
-    all_updates = all_updates[n_attackers:]
-
     if dev_type == 'unit_vec':
         deviation = model_re / torch.norm(model_re)  # unit vector, dir opp to good dir
     elif dev_type == 'sign':
