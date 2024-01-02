@@ -35,7 +35,14 @@ class Arguments:
         self.batch_write = 0
 
         self.clients = 10
+
         self.num_attackers = 2
+        self.attacker_ids = [3, 4]
+        # If attacker_select is set to 'id', num_attackers is ignored and adjusted
+        # to the size of attacker_id, if 'first-n' is selected, 'attacer_ids' does nothing
+        # This only matters for 'vailed-minmax' attack, the rest assume 'first-n' and will
+        # probably break
+        self.attacker_select = 'id' # 'first-n', 'id'
 
         self.topology = 'single' # 'single', 'fedmes'
         self.aggregation = 'average' # 'average', 'median'

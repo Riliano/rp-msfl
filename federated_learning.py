@@ -55,11 +55,15 @@ def run_experiment(args):
 
     # Create clients
     print("creating %d clients" % (args.clients))
-    for i in range(args.clients):
-        if i >= args.num_attackers:
-            clients.append(Client(i, args,  False, criterion))
-        else:
+    if args.attacker_select == 'first-n':
+        for i in range(0, args.num_attackers):
             clients.append(Client(i, args, True, criterion))
+        for i in range(args.num_attackers, args.clients):
+            clients.append(Client(i, args, False, criterion))
+    elif args.attacker_select == 'id':
+        for i in range(0, args.clients):
+            clients.append(Client(i, args, (i in args.attacker_ids), criterion))
+        args.num_attackers = len(args.attacker_ids)
 
     num_attackers = args.num_attackers
     args.num_attackers = 0
@@ -115,26 +119,36 @@ def run_experiment(args):
                 agg_grads = torch.mean(malicious_grads, 0)
                 malicious_grads = minmax_ndss(malicious_grads, agg_grads, args.num_attackers, dev_type=args.dev_type)
             elif args.attack == 'veiled-minmax' and epoch_num:
-                adjust_to_malicious = {}
+                # Store the malicious gradients in a dict, so that it's updated all at once
+                # in the case of multiple attackers
+                malicious_dict = {}
                 for c in clients:
                     if c.is_mal:
                         ids_in_reach = []
-                        for k in server_control_dict:
-                            if c.client_idx in server_control_dict[k]:
-                                ids_in_reach = ids_in_reach + server_control_dict[k]
+                        # Figure out which clients are within the same cell as the attacker
+                        # In the case of single server, that is all of them
+                        if args.topology == 'fedmes':
+                            for k in server_control_dict:
+                                if c.client_idx in server_control_dict[k]:
+                                    ids_in_reach = ids_in_reach + server_control_dict[k]
+                        else:
+                            ids_in_reach = list(range(0, args.clients))
 
+                        # Remove duplicates
                         ids_in_reach = list(set(ids_in_reach))
+
                         if (epoch_num == 1):
                             print('reach of ' + str(c.client_idx))
                             print(ids_in_reach)
+
                         agg_grads = []
                         for i in ids_in_reach:
                             agg_grads.append(malicious_grads[i])
                         agg_grads = torch.stack(agg_grads, 0)
                         m_grad = veiled_minmax(agg_grads, torch.mean(agg_grads, 0), dev_type=args.dev_type)
-                        adjust_to_malicious[c.client_idx] = m_grad
-                for k in adjust_to_malicious:
-                    malicious_grads[k] = adjust_to_malicious[k]
+                        malicious_dict[c.client_idx] = m_grad
+                for k in malicious_dict:
+                    malicious_grads[k] = malicious_dict[k]
 
 
         if not epoch_num:
