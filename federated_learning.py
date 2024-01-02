@@ -115,6 +115,7 @@ def run_experiment(args):
                 agg_grads = torch.mean(malicious_grads, 0)
                 malicious_grads = minmax_ndss(malicious_grads, agg_grads, args.num_attackers, dev_type=args.dev_type)
             elif args.attack == 'veiled-minmax' and epoch_num:
+                adjust_to_malicious = {}
                 for c in clients:
                     if c.is_mal:
                         ids_in_reach = []
@@ -123,16 +124,17 @@ def run_experiment(args):
                                 ids_in_reach = ids_in_reach + server_control_dict[k]
 
                         ids_in_reach = list(set(ids_in_reach))
-                        print('reach of ' + str(c.client_idx))
-                        print(ids_in_reach)
+                        if (epoch_num == 1):
+                            print('reach of ' + str(c.client_idx))
+                            print(ids_in_reach)
                         agg_grads = []
                         for i in ids_in_reach:
-                            # That could lead to a bug where the malicious grads of lower id clients
-                            # are considered as if they're their honest one, but we'll ignore this for now
                             agg_grads.append(malicious_grads[i])
                         agg_grads = torch.stack(agg_grads, 0)
-                        m_grad = veiled_minmax(agg_grads, c.previous_agg_grads, dev_type=args.dev_type)
-                        malicious_grads[c.client_idx] = m_grad
+                        m_grad = veiled_minmax(agg_grads, torch.mean(agg_grads, 0), dev_type=args.dev_type)
+                        adjust_to_malicious[c.client_idx] = m_grad
+                for k in adjust_to_malicious:
+                    malicious_grads[k] = adjust_to_malicious[k]
 
 
         if not epoch_num:

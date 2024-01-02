@@ -77,14 +77,14 @@ def get_model(config, parallel=True, cuda=False, device=0):
 def return_model(model_name, lr, momentum, parallel=False, cuda=True, device=0):
     if model_name == 'resnet-pretrained':
         model = torch.hub.load('chenyaofo/pytorch-cifar-models', 'cifar10_resnet32', pretrained=True)
-        optimizer = Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
+        optimizer = Adam(model.parameters(), lr=lr, weight_decay=1e-5)
     elif model_name == 'dc':
         arch_config = {
             'arch': 'Dc',
             'num_classes': 10,
         }
         model = get_model(arch_config, parallel=parallel, cuda=cuda, device=device)
-        optimizer = SGD(model.parameters(), lr=0.001, momentum=momentum)
+        optimizer = SGD(model.parameters(), lr=lr, momentum=momentum)
 
     elif model_name == 'alexnet':
         arch_config = {
@@ -92,7 +92,7 @@ def return_model(model_name, lr, momentum, parallel=False, cuda=True, device=0):
             'num_classes': 10,
         }
         model = get_model(arch_config, parallel=parallel, cuda=cuda, device=device)
-        optimizer = SGD(model.parameters(), lr=0.001, momentum=momentum)
+        optimizer = SGD(model.parameters(), lr=lr, momentum=momentum)
     elif model_name == 'densenet-bc-100-12':
         arch_config = {
             'arch': 'densenet',
@@ -174,6 +174,6 @@ def return_model(model_name, lr, momentum, parallel=False, cuda=True, device=0):
         model = get_model(arch_config, parallel=parallel, cuda=cuda, device=device)
         optimizer = SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=5e-4)
     else:
-        assert (False), 'Model not found!'
+        assert (False), ('Model not found: ' + model_name)
 
     return model, optimizer
