@@ -6,14 +6,15 @@ torch.manual_seed(SEED)
 class Arguments:
     def __init__(self):
         
-        self.dataset = 'cifar_10'
+        self.available_datasets = ['cifar10']#', fashionmnist']
+        self.dataset = self.available_datasets[0]
         self.arch = 'alexnet' # 'alexnet', 'vgg11', 'resnet-pretrained'
 
-        self.load_pretrained_weights = True
+        self.load_pretrained_weights = False
         self.pretrained_weights_file = './pretrained/model-alexnet.zip'
         self.save_final_model = False
 
-        self.batch_size = 250
+        self.batch_size = 256
         self.schedule = [1000]
         self.gamma = 0.5
         self.fed_lr = 0.2
@@ -22,7 +23,7 @@ class Arguments:
 
         self.dev_type = 'std'
         # Those values are taken from code with 50 clients, likely they need to be recomputed
-        # See LIE attack paper(A Little Is Enough, Baruch et al) for more details
+        # See LIE attack paper(A Little Is Enough..., Baruch et al) for more details
         # 1 and 2 are based on guessing and skimming the formulas
         self.z_values = {1: 0.7054, 2: 0.72575, 3: 0.69847, 5: 0.7054, 8: 0.71904, 10: 0.72575, 12: 0.73891}
 
@@ -36,13 +37,13 @@ class Arguments:
 
         self.clients = 10
 
-        self.num_attackers = 2
+        self.num_attackers = 0
         self.attacker_ids = [3, 4]
         # If attacker_select is set to 'id', num_attackers is ignored and adjusted
         # to the size of attacker_id, if 'first-n' is selected, 'attacer_ids' does nothing
         # This only matters for 'vailed-minmax' attack, the rest assume 'first-n' and will
         # probably break
-        self.attacker_select = 'id' # 'first-n', 'id'
+        self.attacker_select = 'first-n' # 'first-n', 'id'
 
         self.topology = 'single' # 'single', 'fedmes'
         self.aggregation = 'average' # 'average', 'median'
@@ -53,8 +54,8 @@ class Arguments:
         self.parallel = True
 
 
-        if self.dataset == "cifar_10":
-            self.user_tr_len = 4000
+        if self.dataset == "cifar10":
+            self.user_tr_len = 5000
             self.total_tr_len = self.user_tr_len * self.clients
             self.val_len = 10000
             self.te_len = 10000

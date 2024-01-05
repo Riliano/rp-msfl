@@ -2,9 +2,10 @@ import torch
 from cifar10.cifar10_models import return_model
 
 class Client:
-    def __init__(self, client_idx, args, is_mal, criterion):
+    def __init__(self, client_idx, args, data_loader, is_mal, criterion):
         self.client_idx = client_idx
         self.args = args
+        self.data_loader = data_loader
         self.is_mal = is_mal
         self.model_type = self.args.arch
         self.fed_lr = self.args.fed_lr
@@ -15,13 +16,20 @@ class Client:
                                                           momentum=0.9,\
                                                           parallel=args.parallel,\
                                                           cuda=args.cuda)
+        self.data_loader_iter = iter(self.data_loader)
+        self.data_loader_i = 0
         if (args.load_pretrained_weights):
             print('Loading pretrained weights from: ' + args.pretrained_weights_file)
             self.fed_model.load_state_dict(torch.load(args.pretrained_weights_file), strict=False)
 
-    def train(self, inputs, targets):
+    def train(self):#, inputs, targets):
+        if (self.data_loader_i == len(self.data_loader)):
+            self.data_loader_i = 0
+            self.data_loader_iter = iter(self.data_loader)
+
         # Convert inputs and labels to PyTorch Variables
-        inputs, targets = torch.autograd.Variable(inputs), torch.autograd.Variable(targets)
+        inputs, targets = next(self.data_loader_iter)#torch.autograd.Variable(inputs), torch.autograd.Variable(targets)
+        self.data_loader_i = self.data_loader_i + 1
 
         # Forward pass
         outputs = self.fed_model(inputs)

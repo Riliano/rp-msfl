@@ -19,7 +19,8 @@ from attack import min_max_attack, lie_attack, get_malicious_updates_fang_trmean
 from client import Client
 
 def run_experiment(args):
-    tensors = tensor_loader(args)
+#    tensors = tensor_loader(args)
+    loaders, validation = tensor_loader(args)
     nbatches = args.user_tr_len // args.batch_size
 
     criterion = nn.CrossEntropyLoss()
@@ -57,12 +58,12 @@ def run_experiment(args):
     print("creating %d clients" % (args.clients))
     if args.attacker_select == 'first-n':
         for i in range(0, args.num_attackers):
-            clients.append(Client(i, args, True, criterion))
+            clients.append(Client(i, args, loaders[i], True, criterion))
         for i in range(args.num_attackers, args.clients):
-            clients.append(Client(i, args, False, criterion))
+            clients.append(Client(i, args, loaders[i], False, criterion))
     elif args.attacker_select == 'id':
         for i in range(0, args.clients):
-            clients.append(Client(i, args, (i in args.attacker_ids), criterion))
+            clients.append(Client(i, args, loaders[i], (i in args.attacker_ids), criterion))
         args.num_attackers = len(args.attacker_ids)
 
     num_attackers = args.num_attackers
@@ -78,22 +79,22 @@ def run_experiment(args):
                 print('Activating malicious clients')
             args.num_attackers = num_attackers
         # Shuffle data for each epoch except the first one
-        if not epoch_num and epoch_num % nbatches == 0:
-            np.random.shuffle(r)
-            for i in range(args.clients):
-                tensors.user_tr_data[i] = tensors.user_tr_data[i][r]
-                tensors.user_tr_label[i] = tensors.user_tr_label[i][r]
+        #if not epoch_num and epoch_num % nbatches == 0:
+        #    np.random.shuffle(r)
+        #    for i in range(args.clients):
+        #        tensors.user_tr_data[i] = tensors.user_tr_data[i][r]
+        #        tensors.user_tr_label[i] = tensors.user_tr_label[i][r]
 
         # Iterate over users, excluding attackers
 #        for i in range(args.num_attackers, args.clients):
         for i in range(0, args.clients):
             # Get a batch of inputs and targets for the current user
-            inputs = tensors.user_tr_data[i][
-                     (epoch_num % nbatches) * args.batch_size:((epoch_num % nbatches) + 1) * args.batch_size]
-            targets = tensors.user_tr_label[i][
-                      (epoch_num % nbatches) * args.batch_size:((epoch_num % nbatches) + 1) * args.batch_size]
+            #inputs = tensors.user_tr_data[i][
+            #         (epoch_num % nbatches) * args.batch_size:((epoch_num % nbatches) + 1) * args.batch_size]
+            #targets = tensors.user_tr_label[i][
+            #          (epoch_num % nbatches) * args.batch_size:((epoch_num % nbatches) + 1) * args.batch_size]
 
-            param_grad = clients[i].train(inputs, targets)
+            param_grad = clients[i].train()#inputs, targets)
 
             # Concatenate user gradients to the list
             user_grads = param_grad[None, :] if len(user_grads) == 0 else torch.cat((user_grads, param_grad[None, :]),
@@ -229,22 +230,21 @@ def run_experiment(args):
                     comb_0_2 = torch.mean(server_aggregates[[0, 2]], dim=0)
                     client.update_model(comb_0_2)
 
-        val_loss, val_acc = test(tensors.val_data, tensors.val_label, clients[0].fed_model, criterion, args.cuda)
-        te_loss, te_acc = test(tensors.te_data, tensors.te_label, clients[0].fed_model, criterion, args.cuda)
+        val_loss, val_acc = test(validation[0], validation[1], clients[0].fed_model, criterion, args.cuda)
+#        te_loss, te_acc = test(tensors.te_data, tensors.te_label, clients[0].fed_model, criterion, args.cuda)
 
-        is_best = best_global_acc < val_acc
+        #is_best = best_global_acc < val_acc
 
         best_global_acc = max(best_global_acc, val_acc)
 
-        if is_best:
-            best_global_te_acc = te_acc
+        #if is_best:
+        #    best_global_te_acc = te_acc
 
         print("Acc: " + str(val_acc) + " Loss: " + str(val_loss))
         results.append([val_acc, val_loss])
         if epoch_num % 10 == 0 or epoch_num == args.epochs - 1:
-            print('%s, %s: at %s n_at %d e %d fed_model val loss %.4f val acc %.4f best val_acc %f te_acc %f' % (
-                args.topology, args.aggregation, args.attack, args.num_attackers, epoch_num, val_loss, val_acc, best_global_acc,
-                best_global_te_acc))
+            print('%s, %s: at %s n_at %d e %d fed_model val loss %.4f val acc %.4f best val_acc %f' % (
+                args.topology, args.aggregation, args.attack, args.num_attackers, epoch_num, val_loss, val_acc, best_global_acc))
 
         if args.batch_write and epoch_num % args.batch_write == 0:
             print('Writing next batch of results at e ' + str(epoch_num))
