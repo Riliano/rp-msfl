@@ -6,7 +6,7 @@ torch.manual_seed(SEED)
 class Arguments:
     def __init__(self):
         
-        self.available_datasets = ['cifar10']#', fashionmnist']
+        self.available_datasets = ['cifar10', 'fashionmnist']
         self.dataset = self.available_datasets[0]
         self.arch = 'alexnet' # 'alexnet', 'vgg11', 'resnet-pretrained'
 

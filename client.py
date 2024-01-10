@@ -1,5 +1,6 @@
 import torch
-from cifar10.cifar10_models import return_model
+from cifar10.cifar10_models import return_model as return_model_cifar10
+from fashion.fashion_models import return_model as return_model_fashion
 
 class Client:
     def __init__(self, client_idx, args, data_loader, is_mal, criterion):
@@ -10,6 +11,12 @@ class Client:
         self.model_type = self.args.arch
         self.fed_lr = self.args.fed_lr
         self.criterion = criterion
+
+        return_model = None
+        if args.dataset == 'cifar10':
+            return_model = return_model_cifar10
+        elif args.dataset == 'fashionmnist':
+            return_model = return_model_fashion
 
         self.fed_model, self.optimizer_fed = return_model(self.model_type,\
                                                           lr=args.fed_lr,\

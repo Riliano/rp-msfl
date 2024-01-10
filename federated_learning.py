@@ -11,7 +11,7 @@ from cifar10.cifar10_normal_train import *
 
 from utils.misc import get_time_string
 from arguments import Arguments
-from data import TrainingTensors, tensor_loader
+from data import tensor_loader
 
 from aggregation_fedmes import fedmes_median, fedmes_mean
 from aggregation_single_server import *
@@ -19,10 +19,7 @@ from attack import min_max_attack, lie_attack, get_malicious_updates_fang_trmean
 from client import Client
 
 def run_experiment(args):
-#    tensors = tensor_loader(args)
     loaders, validation = tensor_loader(args)
-    nbatches = args.user_tr_len // args.batch_size
-
     criterion = nn.CrossEntropyLoss()
 
     multi_k = (args.aggregation == 'mkrum')
@@ -31,6 +28,7 @@ def run_experiment(args):
     chkpt = './' + args.topology + '-' + args.aggregation
 
     results_file = './results/' + get_time_string()       + '-'\
+                                + args.dataset            + '-'\
                                 + args.topology           + '-'\
                                 + args.aggregation        + '-'\
                                 + str(args.epochs)        +'e-'\
@@ -70,7 +68,7 @@ def run_experiment(args):
     args.num_attackers = 0
     if args.cuda:
         torch.cuda.empty_cache()
-    r = np.arange(args.user_tr_len)
+
     while epoch_num < args.epochs:
         user_grads = []
 
@@ -78,25 +76,8 @@ def run_experiment(args):
             if num_attackers > 0:
                 print('Activating malicious clients')
             args.num_attackers = num_attackers
-        # Shuffle data for each epoch except the first one
-        #if not epoch_num and epoch_num % nbatches == 0:
-        #    np.random.shuffle(r)
-        #    for i in range(args.clients):
-        #        tensors.user_tr_data[i] = tensors.user_tr_data[i][r]
-        #        tensors.user_tr_label[i] = tensors.user_tr_label[i][r]
-
-        # Iterate over users, excluding attackers
-#        for i in range(args.num_attackers, args.clients):
-        for i in range(0, args.clients):
-            # Get a batch of inputs and targets for the current user
-            #inputs = tensors.user_tr_data[i][
-            #         (epoch_num % nbatches) * args.batch_size:((epoch_num % nbatches) + 1) * args.batch_size]
-            #targets = tensors.user_tr_label[i][
-            #          (epoch_num % nbatches) * args.batch_size:((epoch_num % nbatches) + 1) * args.batch_size]
-
-            param_grad = clients[i].train()#inputs, targets)
-
-            # Concatenate user gradients to the list
+        for c in clients:
+            param_grad = c.train()
             user_grads = param_grad[None, :] if len(user_grads) == 0 else torch.cat((user_grads, param_grad[None, :]),
                                                                                     0)
 
@@ -231,14 +212,7 @@ def run_experiment(args):
                     client.update_model(comb_0_2)
 
         val_loss, val_acc = test(validation[0], validation[1], clients[0].fed_model, criterion, args.cuda)
-#        te_loss, te_acc = test(tensors.te_data, tensors.te_label, clients[0].fed_model, criterion, args.cuda)
-
-        #is_best = best_global_acc < val_acc
-
         best_global_acc = max(best_global_acc, val_acc)
-
-        #if is_best:
-        #    best_global_te_acc = te_acc
 
         print("Acc: " + str(val_acc) + " Loss: " + str(val_loss))
         results.append([val_acc, val_loss])
