@@ -7,7 +7,7 @@ class Arguments:
     def __init__(self):
         
         self.available_datasets = ['cifar10', 'fashionmnist']
-        self.dataset = self.available_datasets[0]
+        self.dataset = self.available_datasets[1]
         self.arch = 'alexnet' # 'alexnet', 'vgg11', 'resnet-pretrained'
 
         self.load_pretrained_weights = False
@@ -15,11 +15,12 @@ class Arguments:
         self.save_final_model = False
 
         self.batch_size = 256
-        self.schedule = [1000]
-        self.gamma = 0.5
-        self.fed_lr = 0.2
+        self.schedule = [60, 120, 240, 340, 420, 1000]
+
+        self.gamma = 0.7
+        self.fed_lr = 0.4
         if self.arch == 'resnet-pretrained' or self.load_pretrained_weights:
-            self.fed_lr = 0.00012
+            self.fed_lr = 0.00082
 
         self.dev_type = 'std'
         # Those values are taken from code with 50 clients, likely they need to be recomputed
@@ -29,7 +30,7 @@ class Arguments:
 
 
         self.resume = 0
-        self.epochs = 50
+        self.epochs = 1200
         self.epochs_before_attack = 0
 
         # How many epochs before the results are saved, disable with 0
@@ -52,28 +53,3 @@ class Arguments:
 
         self.cuda = False
         self.parallel = True
-
-
-        if self.dataset == "cifar10":
-            self.user_tr_len = 5000
-            self.total_tr_len = self.user_tr_len * self.clients
-            self.val_len = 10000
-            self.te_len = 10000
-#            #self.net = Cifar10CNN
-#            # self.net = Cifar10ResNet
-#
-#            self.lr = 0.01
-#            self.momentum = 0.5
-#            self.scheduler_step_size = 50
-#            self.scheduler_gamma = 0.5
-#            self.min_lr = 1e-10
-#            self.N = 50000
-#            self.generator_image_num = 50
-#            self.generator_local_epoch = 10
-#            self.layer_image_num = 50
-#            self.layer_image_epoch = 10
-#            self.reduce = 1
-
-#            self.train_data_loader_pickle_path = "data_loaders/cifar10/train_data_loader.pickle"
-#            self.test_data_loader_pickle_path = "data_loaders/cifar10/test_data_loader.pickle"
-

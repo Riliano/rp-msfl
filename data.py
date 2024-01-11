@@ -33,8 +33,7 @@ def load_data(dataset):
         train_transform = transforms.Compose([
             transforms.Resize((32, 32)),
             transforms.ToTensor(),
-            #transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-            #transforms.Normalize((0.1307,), (0.3081,))
+            transforms.Normalize((0.1307,), (0.3081,))
         ])
         train = datasets.FashionMNIST(root=data_loc, train=True, download=True, transform=train_transform)
         test  = datasets.FashionMNIST(root=data_loc, train=False, download=True, transform=train_transform)
