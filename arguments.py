@@ -38,18 +38,19 @@ class Arguments:
 
         self.clients = 10
 
-        self.num_attackers = 0
-        self.attacker_ids = [3, 4]
+        self.num_attackers = 1
+        self.attacker_ids = [5]
         # If attacker_select is set to 'id', num_attackers is ignored and adjusted
         # to the size of attacker_id, if 'first-n' is selected, 'attacer_ids' does nothing
         # This only matters for 'vailed-minmax' attack, the rest assume 'first-n' and will
         # probably break
-        self.attacker_select = 'first-n' # 'first-n', 'id'
+        self.attacker_select = 'id' # 'first-n', 'id'
 
-        self.topology = 'single' # 'single', 'fedmes'
+        self.topology = 'fedmes' # 'single', 'fedmes'
+        self.topology_variatoin = 'dense' # 'sparse'
         self.aggregation = 'average' # 'average', 'median'
 
-        self.attack = 'minmax' # 'minmax', 'fang', 'lie', 'veiled-minmax'
+        self.attack = 'veiled-minmax' # 'minmax', 'fang', 'lie', 'veiled-minmax'
 
         self.cuda = False
         self.parallel = True

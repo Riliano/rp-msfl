@@ -18,6 +18,19 @@ from aggregation_single_server import *
 from attack import min_max_attack, lie_attack, get_malicious_updates_fang_trmean, minmax_ndss, veiled_minmax
 from client import Client
 
+def find_servers_in_reach(args, server_control_dict):
+    client_reach_list = []
+    overlap_weight_index = {}
+    for i in range(args.clients):
+        reach = []
+        for k in server_control_dict:
+            if i in server_control_dict[k]:
+                reach.append(k)
+        client_reach_list.append(reach)
+        overlap_weight_index[i] = len(reach)
+    return client_reach_list, overlap_weight_index
+
+
 def run_experiment(args):
     loaders, validation = tensor_loader(args)
     criterion = nn.CrossEntropyLoss()
@@ -41,10 +54,14 @@ def run_experiment(args):
         with open(results_file, 'w') as csvfile:
             csv.writer(csvfile).writerow(['Accuracy', 'Loss'])
 
-    # Keep track of the clients each server reaches
-    server_control_dict = {0: [0, 1, 2, 3, 4, 5], 1: [1, 2, 0, 6, 7, 8], 2: [3, 4, 0, 7, 8, 9]}
-    # Keep track of weights
-    overlap_weight_index = {0: 3, 1: 2, 2: 2, 3: 2, 4: 2, 5: 1, 6: 1, 7: 2, 8: 2, 9: 1}
+    if args.topology_variatoin == 'dense':
+        # Keep track of the clients each server reaches
+        server_control_dict = {0: [0, 1, 2, 3, 4, 5], 1: [1, 2, 0, 6, 7, 8], 2: [3, 4, 0, 7, 8, 9]}
+        # Keep track of weights
+        #overlap_weight_index = {0: 3, 1: 2, 2: 2, 3: 2, 4: 2, 5: 1, 6: 1, 7: 2, 8: 2, 9: 1}
+        client_server_reach, overlap_weight_index = find_servers_in_reach(args, server_control_dict)
+    elif args.topology_variatoin == 'sparse':
+        print('todo')
 
     epoch_num = 0
     best_global_acc = 0
@@ -117,9 +134,8 @@ def run_experiment(args):
                         # Figure out which clients are within the same cell as the attacker
                         # In the case of single server, that is all of them
                         if args.topology == 'fedmes':
-                            for k in server_control_dict:
-                                if c.client_idx in server_control_dict[k]:
-                                    ids_in_reach = ids_in_reach + server_control_dict[k]
+                            for server_id in client_server_reach[c.client_idx]:
+                                ids_in_reach = ids_in_reach + server_control_dict[server_id]
                         else:
                             ids_in_reach = list(range(0, args.clients))
 
@@ -191,25 +207,29 @@ def run_experiment(args):
                 c.update_model(server_aggregates[0])
         elif args.topology == 'fedmes':
             # Update models of clients taking into account the servers that reach it
-            for client in clients:
-                if client.client_idx == 5:
-                    client.update_model(server_aggregates[0])
-                elif client.client_idx == 6:
-                    client.update_model(server_aggregates[1])
-                elif client.client_idx == 9:
-                    client.update_model(server_aggregates[2])
-                elif client.client_idx == 0:
-                    comb_all = torch.mean(server_aggregates, dim=0)
-                    client.update_model(comb_all)
-                elif client.client_idx in [1, 2]:
-                    comb_0_1 = torch.mean(server_aggregates[:2], dim=0)
-                    client.update_model(comb_0_1)
-                elif client.client_idx in [7, 8]:
-                    comb_1_2 = torch.mean(server_aggregates[1:], dim=0)
-                    client.update_model(comb_1_2)
-                elif client.client_idx in [3, 4]:
-                    comb_0_2 = torch.mean(server_aggregates[[0, 2]], dim=0)
-                    client.update_model(comb_0_2)
+            for c in clients:
+                reach = client_server_reach[c.client_idx]
+                comb = torch.mean(server_aggregates[reach], dim=0)
+                c.update_model(comb)
+            #for client in clients:
+            #    if client.client_idx == 5:
+            #        client.update_model(server_aggregates[0])
+            #    elif client.client_idx == 6:
+            #        client.update_model(server_aggregates[1])
+            #    elif client.client_idx == 9:
+            #        client.update_model(server_aggregates[2])
+            #    elif client.client_idx == 0:
+            #        comb_all = torch.mean(server_aggregates, dim=0)
+            #        client.update_model(comb_all)
+            #    elif client.client_idx in [1, 2]:
+            #        comb_0_1 = torch.mean(server_aggregates[:2], dim=0)
+            #        client.update_model(comb_0_1)
+            #    elif client.client_idx in [7, 8]:
+            #        comb_1_2 = torch.mean(server_aggregates[1:], dim=0)
+            #        client.update_model(comb_1_2)
+            #    elif client.client_idx in [3, 4]:
+            #        comb_0_2 = torch.mean(server_aggregates[[0, 2]], dim=0)
+            #        client.update_model(comb_0_2)
 
         val_loss, val_acc = test(validation[0], validation[1], clients[0].fed_model, criterion, args.cuda)
         best_global_acc = max(best_global_acc, val_acc)

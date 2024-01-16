@@ -39,6 +39,4 @@ class FashionCNN(nn.Module):
 
 def fashioncnn(**kwargs):
     model = FashionCNN(**kwargs)
-    print("Hiiii")
-    print(model)
     return model
