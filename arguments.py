@@ -6,9 +6,9 @@ torch.manual_seed(SEED)
 class Arguments:
     def __init__(self):
         
-        self.available_datasets = ['cifar10', 'fashionmnist']
-        self.dataset = self.available_datasets[1]
-        self.arch = 'alexnet' # 'alexnet', 'vgg11', 'resnet-pretrained'
+        self.available_datasets = ['fashionmnist']
+        self.dataset = self.available_datasets[0]
+        self.arch = 'fashioncnn' # 'alexnet', 'vgg11', 'resnet-pretrained', 'fashioncnn'
 
         self.load_pretrained_weights = False
         self.pretrained_weights_file = './pretrained/model-alexnet.zip'
@@ -18,7 +18,7 @@ class Arguments:
         self.schedule = [60, 120, 240, 340, 420, 1000]
 
         self.gamma = 0.7
-        self.fed_lr = 0.4
+        self.fed_lr = 0.01
         if self.arch == 'resnet-pretrained' or self.load_pretrained_weights:
             self.fed_lr = 0.00082
 

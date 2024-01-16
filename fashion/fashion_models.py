@@ -72,6 +72,13 @@ def return_model(model_name, lr, momentum, parallel=False, cuda=True, device=0):
         }
         model = get_model(arch_config, parallel=parallel, cuda=cuda, device=device)
         optimizer = SGD(model.parameters(), lr=lr, momentum=momentum)
+    elif model_name == 'fashioncnn':
+        arch_config = {
+            'arch': 'fashioncnn',
+            'num_classes': 10,
+        }
+        model = get_model(arch_config, parallel=parallel, cuda=cuda, device=device)
+        optimizer = Adam(model.parameters(), lr=lr)
     elif model_name == 'densenet-bc-100-12':
         arch_config = {
             'arch': 'densenet',
