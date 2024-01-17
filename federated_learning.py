@@ -54,14 +54,8 @@ def run_experiment(args):
         with open(results_file, 'w') as csvfile:
             csv.writer(csvfile).writerow(['Accuracy', 'Loss'])
 
-    if args.topology_variatoin == 'dense':
-        # Keep track of the clients each server reaches
-        server_control_dict = {0: [0, 1, 2, 3, 4, 5], 1: [1, 2, 0, 6, 7, 8], 2: [3, 4, 0, 7, 8, 9]}
-        # Keep track of weights
-        #overlap_weight_index = {0: 3, 1: 2, 2: 2, 3: 2, 4: 2, 5: 1, 6: 1, 7: 2, 8: 2, 9: 1}
-        client_server_reach, overlap_weight_index = find_servers_in_reach(args, server_control_dict)
-    elif args.topology_variatoin == 'sparse':
-        print('todo')
+    server_control_dict = args.server_control_dict
+    client_server_reach, overlap_weight_index = find_servers_in_reach(args, server_control_dict)
 
     epoch_num = 0
     best_global_acc = 0
@@ -124,6 +118,41 @@ def run_experiment(args):
             elif args.attack == 'minmax':
                 agg_grads = torch.mean(clean_grads, 0)
                 malicious_grads = minmax_ndss(clean_grads, agg_grads, args.num_attackers, dev_type=args.dev_type)
+            elif args.attack == 'collab-minmax' and epoch_num:
+                agg_grads = []
+                mal_id = []
+                for c in clients:
+                    if c.is_mal:
+                        mal_id.append(c.client_idx)
+                        agg_grads.append(malicious_grads[c.client_idx])
+                        for update in c.available_updates:
+                            agg_grads.append(update)
+                agg_grads = torch.stack(agg_grads, 0)
+                mean = torch.mean(agg_grads, 0)
+                m_grad = veiled_minmax(agg_grads, mean, dev_type=args.dev_type)
+                if (epoch_num == 1):
+                    for i in mal_id:
+                        print('available updates ' + str(len(clients[i].available_updates)))
+                        print('servers: ', client_server_reach[clients[i].client_idx])
+
+                for i in mal_id:
+                    malicious_grads[i] = m_grad
+
+            elif args.attack == 'zerok-minmax' and epoch_num:
+                for c in clients:
+                    agg_grads = []
+                    if c.is_mal:
+                        agg_grads.append(malicious_grads[c.client_idx])
+                        for update in c.available_updates:
+                            agg_grads.append(update)
+
+                        if (epoch_num == 1):
+                            print('available updates ' + str(len(c.available_updates)))
+                            print('servers: ', client_server_reach[c.client_idx])
+
+                        agg_grads = torch.stack(agg_grads, 0)
+                        m_grad = veiled_minmax(agg_grads, torch.mean(agg_grads, 0), dev_type=args.dev_type)
+                        malicious_grads[c.client_idx] = m_grad
             elif args.attack == 'veiled-minmax' and epoch_num:
                 # Store the malicious gradients in a dict, so that it's updated all at once
                 # in the case of multiple attackers
@@ -147,10 +176,13 @@ def run_experiment(args):
                             print(ids_in_reach)
 
                         agg_grads = []
-                        for i in ids_in_reach:
+                        #for i in ids_in_reach:
+                        for i in [c.client_idx]:
+                            agg_grads.append(malicious_grads[i])
                             agg_grads.append(malicious_grads[i])
                         agg_grads = torch.stack(agg_grads, 0)
-                        m_grad = veiled_minmax(agg_grads, torch.mean(agg_grads, 0), dev_type=args.dev_type)
+                        #m_grad = veiled_minmax(agg_grads, torch.mean(agg_grads, 0), dev_type=args.dev_type)
+                        m_grad = veiled_minmax(agg_grads, c.previous_agg_grads, dev_type=args.dev_type)
                         malicious_dict[c.client_idx] = m_grad
                 for k in malicious_dict:
                     malicious_grads[k] = malicious_dict[k]
@@ -210,6 +242,7 @@ def run_experiment(args):
             for c in clients:
                 reach = client_server_reach[c.client_idx]
                 comb = torch.mean(server_aggregates[reach], dim=0)
+                c.available_updates = server_aggregates[reach]
                 c.update_model(comb)
             #for client in clients:
             #    if client.client_idx == 5:
@@ -246,7 +279,7 @@ def run_experiment(args):
                 csv.writer(csvfile).writerows(results)
                 results.clear()
 
-        if val_loss > 10:
+        if val_loss > 100:
             print('val loss %f too high' % val_loss)
             break
 
