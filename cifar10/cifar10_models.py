@@ -76,6 +76,10 @@ def get_model(config, parallel=True, cuda=False, device=0):
 
 def return_model(model_name, lr, momentum, parallel=False, cuda=True, device=0):
     if model_name == 'resnet-pretrained':
+        # Note: This might get depricated in the near future, if this is the case
+        # you might be able to still download the models from:
+        # https://github.com/chenyaofo/pytorch-cifar-models
+        # and manually import them
         model = torch.hub.load('chenyaofo/pytorch-cifar-models', 'cifar10_resnet32', pretrained=True)
         optimizer = Adam(model.parameters(), lr=lr, weight_decay=1e-5)
     elif model_name == 'dc':

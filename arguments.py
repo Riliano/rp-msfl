@@ -6,9 +6,9 @@ torch.manual_seed(SEED)
 class Arguments:
     def __init__(self):
         
-        self.available_datasets = ['fashionmnist']
-        self.dataset = self.available_datasets[0]
-        self.arch = 'fashioncnn' # 'alexnet', 'vgg11', 'resnet-pretrained', 'fashioncnn'
+        self.available_datasets = ['fashionmnist', 'cifar10']
+        self.dataset = self.available_datasets[1]
+        self.arch = 'resnet-pretrained' # 'alexnet', 'vgg11', 'resnet-pretrained', 'fashioncnn'
 
         self.load_pretrained_weights = False
         self.pretrained_weights_file = './pretrained/model-alexnet.zip'
@@ -30,7 +30,7 @@ class Arguments:
 
 
         self.resume = 0
-        self.epochs = 1200
+        self.epochs = 50
         self.epochs_before_attack = 0
 
         # How many epochs before the results are saved, disable with 0
@@ -55,7 +55,7 @@ class Arguments:
 
         self.aggregation = 'average' # 'average', 'median'
 
-        self.attack = 'collab-minmax' # 'minmax', 'fang', 'lie', 'veiled-minmax' 'zerok-minmax'
+        self.attack = 'veiled-minmax' # 'minmax', 'fang', 'lie', 'veiled-minmax' 'zerok-minmax'
 
         self.cuda = False
         self.parallel = True

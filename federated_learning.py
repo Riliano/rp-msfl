@@ -49,8 +49,8 @@ def run_experiment(args):
                                 + args.attack             + '-'\
                                 + args.arch               + '.csv'
     results = []
+    print('Results will be saved in: ' + results_file)
     if args.batch_write:
-        print('Results will be saved in: ' + results_file)
         with open(results_file, 'w') as csvfile:
             csv.writer(csvfile).writerow(['Accuracy', 'Loss'])
 
@@ -125,6 +125,8 @@ def run_experiment(args):
                     if c.is_mal:
                         mal_id.append(c.client_idx)
                         agg_grads.append(malicious_grads[c.client_idx])
+                        #!!!This is important!!!
+                        #Missing getters/setters for available_updates in client.py
                         for update in c.available_updates:
                             agg_grads.append(update)
                 agg_grads = torch.stack(agg_grads, 0)
@@ -143,6 +145,8 @@ def run_experiment(args):
                     agg_grads = []
                     if c.is_mal:
                         agg_grads.append(malicious_grads[c.client_idx])
+                        #!!!This is important!!!
+                        #Missing getters/setters for available_updates in client.py
                         for update in c.available_updates:
                             agg_grads.append(update)
 
@@ -181,8 +185,8 @@ def run_experiment(args):
                             agg_grads.append(malicious_grads[i])
                             agg_grads.append(malicious_grads[i])
                         agg_grads = torch.stack(agg_grads, 0)
-                        #m_grad = veiled_minmax(agg_grads, torch.mean(agg_grads, 0), dev_type=args.dev_type)
-                        m_grad = veiled_minmax(agg_grads, c.previous_agg_grads, dev_type=args.dev_type)
+                        m_grad = veiled_minmax(agg_grads, torch.mean(agg_grads, 0), dev_type=args.dev_type)
+                        #m_grad = veiled_minmax(agg_grads, c.previous_agg_grads, dev_type=args.dev_type)
                         malicious_dict[c.client_idx] = m_grad
                 for k in malicious_dict:
                     malicious_grads[k] = malicious_dict[k]
@@ -242,6 +246,8 @@ def run_experiment(args):
             for c in clients:
                 reach = client_server_reach[c.client_idx]
                 comb = torch.mean(server_aggregates[reach], dim=0)
+                #!!!This is important!!!
+                #Missing getters/setters for available_updates in client.py
                 c.available_updates = server_aggregates[reach]
                 c.update_model(comb)
             #for client in clients:
