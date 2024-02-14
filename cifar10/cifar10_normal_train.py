@@ -1,4 +1,3 @@
-
 from cifar10.cifar10_models import *
 from utils.eval import accuracy
 from utils.misc import AverageMeter

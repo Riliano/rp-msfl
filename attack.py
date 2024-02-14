@@ -135,3 +135,42 @@ def minmax_ndss(all_updates, model_re, n_attackers, dev_type='unit_vec', thresho
     mal_updates = torch.cat((mal_updates, all_updates), 0)
 
     return mal_updates
+
+def veiled_minmax(available_updates, cell_model_re, dev_type='unit_vec', threshold=30):
+    if dev_type == 'unit_vec':
+        deviation = cell_model_re / torch.norm(cell_model_re)  # unit vector, dir opp to good dir
+    elif dev_type == 'sign':
+        deviation = torch.sign(cell_model_re)
+    elif dev_type == 'std':
+        deviation = torch.std(available_updates, 0)
+
+    lamda = torch.Tensor([threshold]).float()  # .cuda()
+    # print(lamda)
+    threshold_diff = 1e-5
+    lamda_fail = lamda
+    lamda_succ = 0
+
+    distances = []
+    for update in available_updates:
+        distance = torch.norm((available_updates - update), dim=1) ** 2
+        distances = distance[None, :] if not len(distances) else torch.cat((distances, distance[None, :]), 0)
+
+    max_distance = torch.max(distances)
+    del distances
+
+    while torch.abs(lamda_succ - lamda) > threshold_diff:
+        mal_update = (cell_model_re - lamda * deviation)
+        distance = torch.norm((available_updates - mal_update), dim=1) ** 2
+        max_d = torch.max(distance)
+
+        if max_d <= max_distance:
+            # print('successful lamda is ', lamda)
+            lamda_succ = lamda
+            lamda = lamda + lamda_fail / 2
+        else:
+            lamda = lamda - lamda_fail / 2
+
+        lamda_fail = lamda_fail / 2
+
+    mal_update = (cell_model_re - lamda_succ * deviation)
+    return mal_update

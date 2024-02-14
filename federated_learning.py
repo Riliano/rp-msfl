@@ -11,17 +11,28 @@ from cifar10.cifar10_normal_train import *
 
 from utils.misc import get_time_string
 from arguments import Arguments
-from data import TrainingTensors, tensor_loader
+from data import tensor_loader
 
 from aggregation_fedmes import fedmes_median, fedmes_mean
 from aggregation_single_server import *
-from attack import min_max_attack, lie_attack, get_malicious_updates_fang_trmean, minmax_ndss
+from attack import min_max_attack, lie_attack, get_malicious_updates_fang_trmean, minmax_ndss, veiled_minmax
 from client import Client
 
-def run_experiment(args):
-    tensors = tensor_loader(args)
-    nbatches = args.user_tr_len // args.batch_size
+def find_servers_in_reach(args, server_control_dict):
+    client_reach_list = []
+    overlap_weight_index = {}
+    for i in range(args.clients):
+        reach = []
+        for k in server_control_dict:
+            if i in server_control_dict[k]:
+                reach.append(k)
+        client_reach_list.append(reach)
+        overlap_weight_index[i] = len(reach)
+    return client_reach_list, overlap_weight_index
 
+
+def run_experiment(args):
+    loaders, validation = tensor_loader(args)
     criterion = nn.CrossEntropyLoss()
 
     multi_k = (args.aggregation == 'mkrum')
@@ -30,21 +41,21 @@ def run_experiment(args):
     chkpt = './' + args.topology + '-' + args.aggregation
 
     results_file = './results/' + get_time_string()       + '-'\
+                                + args.dataset            + '-'\
                                 + args.topology           + '-'\
                                 + args.aggregation        + '-'\
                                 + str(args.epochs)        +'e-'\
                                 + str(args.num_attackers) + 'att-'\
+                                + args.attack             + '-'\
                                 + args.arch               + '.csv'
     results = []
+    print('Results will be saved in: ' + results_file)
     if args.batch_write:
-        print('Results will be saved in: ' + results_file)
         with open(results_file, 'w') as csvfile:
             csv.writer(csvfile).writerow(['Accuracy', 'Loss'])
 
-    # Keep track of the clients each server reaches
-    server_control_dict = {0: [0, 1, 2, 3, 4, 5], 1: [1, 2, 0, 6, 7, 8], 2: [3, 4, 0, 7, 8, 9]}
-    # Keep track of weights
-    overlap_weight_index = {0: 3, 1: 2, 2: 2, 3: 2, 4: 2, 5: 1, 6: 1, 7: 2, 8: 2, 9: 1}
+    server_control_dict = args.server_control_dict
+    client_server_reach, overlap_weight_index = find_servers_in_reach(args, server_control_dict)
 
     epoch_num = 0
     best_global_acc = 0
@@ -54,17 +65,21 @@ def run_experiment(args):
 
     # Create clients
     print("creating %d clients" % (args.clients))
-    for i in range(args.clients):
-        if i >= args.num_attackers:
-            clients.append(Client(i, args,  False, criterion))
-        else:
-            clients.append(Client(i, args, True, criterion))
+    if args.attacker_select == 'first-n':
+        for i in range(0, args.num_attackers):
+            clients.append(Client(i, args, loaders[i], True, criterion))
+        for i in range(args.num_attackers, args.clients):
+            clients.append(Client(i, args, loaders[i], False, criterion))
+    elif args.attacker_select == 'id':
+        for i in range(0, args.clients):
+            clients.append(Client(i, args, loaders[i], (i in args.attacker_ids), criterion))
+        args.num_attackers = len(args.attacker_ids)
 
     num_attackers = args.num_attackers
     args.num_attackers = 0
     if args.cuda:
         torch.cuda.empty_cache()
-    r = np.arange(args.user_tr_len)
+
     while epoch_num < args.epochs:
         user_grads = []
 
@@ -72,29 +87,20 @@ def run_experiment(args):
             if num_attackers > 0:
                 print('Activating malicious clients')
             args.num_attackers = num_attackers
-        # Shuffle data for each epoch except the first one
-        if not epoch_num and epoch_num % nbatches == 0:
-            np.random.shuffle(r)
-            for i in range(args.clients):
-                tensors.user_tr_data[i] = tensors.user_tr_data[i][r]
-                tensors.user_tr_label[i] = tensors.user_tr_label[i][r]
-
-        # Iterate over users, excluding attackers
-        for i in range(args.num_attackers, args.clients):
-            # Get a batch of inputs and targets for the current user
-            inputs = tensors.user_tr_data[i][
-                     (epoch_num % nbatches) * args.batch_size:((epoch_num % nbatches) + 1) * args.batch_size]
-            targets = tensors.user_tr_label[i][
-                      (epoch_num % nbatches) * args.batch_size:((epoch_num % nbatches) + 1) * args.batch_size]
-
-            param_grad = clients[i].train(inputs, targets)
-
-            # Concatenate user gradients to the list
+        for c in clients:
+            param_grad = c.train()
             user_grads = param_grad[None, :] if len(user_grads) == 0 else torch.cat((user_grads, param_grad[None, :]),
                                                                                     0)
 
         # Store the collected user gradients as malicious gradients
         malicious_grads = user_grads
+
+        # Collect the gradients from all benign clients
+        clean_grads = []
+        for c in clients:
+            if not c.is_mal:
+                clean_grads.append(user_grads[c.client_idx])
+        clean_grads = torch.stack(clean_grads, 0)
 
         # Update learning rate of clients
         for client in clients:
@@ -103,15 +109,88 @@ def run_experiment(args):
         # Add the parameters of the malicious clients depending on attack type
         if args.num_attackers > 0:
             if args.attack == 'lie':
-                mal_update = lie_attack(malicious_grads, args.z_values[args.num_attackers])
-                malicious_grads = torch.cat((torch.stack([mal_update] * args.num_attackers), malicious_grads))
+                mal_update = lie_attack(clean_grads, args.z_values[args.num_attackers])
+                malicious_grads = torch.cat((torch.stack([mal_update] * args.num_attackers), clean_grads))
             elif args.attack == 'fang':
-                agg_grads = torch.mean(malicious_grads, 0)
+                agg_grads = torch.mean(clean_grads, 0)
                 deviation = torch.sign(agg_grads)
-                malicious_grads = get_malicious_updates_fang_trmean(malicious_grads, deviation, args.num_attackers, epoch_num)
+                malicious_grads = get_malicious_updates_fang_trmean(clean_grads, deviation, args.num_attackers, epoch_num)
             elif args.attack == 'minmax':
-                agg_grads = torch.mean(malicious_grads, 0)
-                malicious_grads = minmax_ndss(malicious_grads, agg_grads, args.num_attackers, dev_type=args.dev_type)
+                agg_grads = torch.mean(clean_grads, 0)
+                malicious_grads = minmax_ndss(clean_grads, agg_grads, args.num_attackers, dev_type=args.dev_type)
+            elif args.attack == 'collab-minmax' and epoch_num:
+                agg_grads = []
+                mal_id = []
+                for c in clients:
+                    if c.is_mal:
+                        mal_id.append(c.client_idx)
+                        agg_grads.append(malicious_grads[c.client_idx])
+                        #!!!This is important!!!
+                        #Missing getters/setters for available_updates in client.py
+                        for update in c.available_updates:
+                            agg_grads.append(update)
+                agg_grads = torch.stack(agg_grads, 0)
+                mean = torch.mean(agg_grads, 0)
+                m_grad = veiled_minmax(agg_grads, mean, dev_type=args.dev_type)
+                if (epoch_num == 1):
+                    for i in mal_id:
+                        print('available updates ' + str(len(clients[i].available_updates)))
+                        print('servers: ', client_server_reach[clients[i].client_idx])
+
+                for i in mal_id:
+                    malicious_grads[i] = m_grad
+
+            elif args.attack == 'zerok-minmax' and epoch_num:
+                for c in clients:
+                    agg_grads = []
+                    if c.is_mal:
+                        agg_grads.append(malicious_grads[c.client_idx])
+                        #!!!This is important!!!
+                        #Missing getters/setters for available_updates in client.py
+                        for update in c.available_updates:
+                            agg_grads.append(update)
+
+                        if (epoch_num == 1):
+                            print('available updates ' + str(len(c.available_updates)))
+                            print('servers: ', client_server_reach[c.client_idx])
+
+                        agg_grads = torch.stack(agg_grads, 0)
+                        m_grad = veiled_minmax(agg_grads, torch.mean(agg_grads, 0), dev_type=args.dev_type)
+                        malicious_grads[c.client_idx] = m_grad
+            elif args.attack == 'veiled-minmax' and epoch_num:
+                # Store the malicious gradients in a dict, so that it's updated all at once
+                # in the case of multiple attackers
+                malicious_dict = {}
+                for c in clients:
+                    if c.is_mal:
+                        ids_in_reach = []
+                        # Figure out which clients are within the same cell as the attacker
+                        # In the case of single server, that is all of them
+                        if args.topology == 'fedmes':
+                            for server_id in client_server_reach[c.client_idx]:
+                                ids_in_reach = ids_in_reach + server_control_dict[server_id]
+                        else:
+                            ids_in_reach = list(range(0, args.clients))
+
+                        # Remove duplicates
+                        ids_in_reach = list(set(ids_in_reach))
+
+                        if (epoch_num == 1):
+                            print('reach of ' + str(c.client_idx))
+                            print(ids_in_reach)
+
+                        agg_grads = []
+                        #for i in ids_in_reach:
+                        for i in [c.client_idx]:
+                            agg_grads.append(malicious_grads[i])
+                            agg_grads.append(malicious_grads[i])
+                        agg_grads = torch.stack(agg_grads, 0)
+                        m_grad = veiled_minmax(agg_grads, torch.mean(agg_grads, 0), dev_type=args.dev_type)
+                        #m_grad = veiled_minmax(agg_grads, c.previous_agg_grads, dev_type=args.dev_type)
+                        malicious_dict[c.client_idx] = m_grad
+                for k in malicious_dict:
+                    malicious_grads[k] = malicious_dict[k]
+
 
         if not epoch_num:
             print(malicious_grads.shape)
@@ -164,42 +243,41 @@ def run_experiment(args):
                 c.update_model(server_aggregates[0])
         elif args.topology == 'fedmes':
             # Update models of clients taking into account the servers that reach it
-            for client in clients:
-                if client.client_idx == 5:
-                    client.update_model(server_aggregates[0])
-                elif client.client_idx == 6:
-                    client.update_model(server_aggregates[1])
-                elif client.client_idx == 9:
-                    client.update_model(server_aggregates[2])
-                elif client.client_idx == 0:
-                    comb_all = torch.mean(server_aggregates, dim=0)
-                    client.update_model(comb_all)
-                elif client.client_idx in [1, 2]:
-                    comb_0_1 = torch.mean(server_aggregates[:2], dim=0)
-                    client.update_model(comb_0_1)
-                elif client.client_idx in [7, 8]:
-                    comb_1_2 = torch.mean(server_aggregates[1:], dim=0)
-                    client.update_model(comb_1_2)
-                elif client.client_idx in [3, 4]:
-                    comb_0_2 = torch.mean(server_aggregates[[0, 2]], dim=0)
-                    client.update_model(comb_0_2)
+            for c in clients:
+                reach = client_server_reach[c.client_idx]
+                comb = torch.mean(server_aggregates[reach], dim=0)
+                #!!!This is important!!!
+                #Missing getters/setters for available_updates in client.py
+                c.available_updates = server_aggregates[reach]
+                c.update_model(comb)
+            #for client in clients:
+            #    if client.client_idx == 5:
+            #        client.update_model(server_aggregates[0])
+            #    elif client.client_idx == 6:
+            #        client.update_model(server_aggregates[1])
+            #    elif client.client_idx == 9:
+            #        client.update_model(server_aggregates[2])
+            #    elif client.client_idx == 0:
+            #        comb_all = torch.mean(server_aggregates, dim=0)
+            #        client.update_model(comb_all)
+            #    elif client.client_idx in [1, 2]:
+            #        comb_0_1 = torch.mean(server_aggregates[:2], dim=0)
+            #        client.update_model(comb_0_1)
+            #    elif client.client_idx in [7, 8]:
+            #        comb_1_2 = torch.mean(server_aggregates[1:], dim=0)
+            #        client.update_model(comb_1_2)
+            #    elif client.client_idx in [3, 4]:
+            #        comb_0_2 = torch.mean(server_aggregates[[0, 2]], dim=0)
+            #        client.update_model(comb_0_2)
 
-        val_loss, val_acc = test(tensors.val_data, tensors.val_label, clients[0].fed_model, criterion, args.cuda)
-        te_loss, te_acc = test(tensors.te_data, tensors.te_label, clients[0].fed_model, criterion, args.cuda)
-
-        is_best = best_global_acc < val_acc
-
+        val_loss, val_acc = test(validation[0], validation[1], clients[0].fed_model, criterion, args.cuda)
         best_global_acc = max(best_global_acc, val_acc)
-
-        if is_best:
-            best_global_te_acc = te_acc
 
         print("Acc: " + str(val_acc) + " Loss: " + str(val_loss))
         results.append([val_acc, val_loss])
         if epoch_num % 10 == 0 or epoch_num == args.epochs - 1:
-            print('%s, %s: at %s n_at %d e %d fed_model val loss %.4f val acc %.4f best val_acc %f te_acc %f' % (
-                args.topology, args.aggregation, args.attack, args.num_attackers, epoch_num, val_loss, val_acc, best_global_acc,
-                best_global_te_acc))
+            print('%s, %s: at %s n_at %d e %d fed_model val loss %.4f val acc %.4f best val_acc %f' % (
+                args.topology, args.aggregation, args.attack, args.num_attackers, epoch_num, val_loss, val_acc, best_global_acc))
 
         if args.batch_write and epoch_num % args.batch_write == 0:
             print('Writing next batch of results at e ' + str(epoch_num))
@@ -207,7 +285,7 @@ def run_experiment(args):
                 csv.writer(csvfile).writerows(results)
                 results.clear()
 
-        if val_loss > 10:
+        if val_loss > 100:
             print('val loss %f too high' % val_loss)
             break
 
